@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Find</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+        }
+        body {
+            background: #0b0c10;
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+        }
+        .filters {
+            background: #1f2833;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+            border: 1px solid #45a29e;
+        }
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+        .filter-group {
+            flex: 1 1 200px;
+        }
+        .filter-group label {
+            display: block;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: #66fcf1;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .filter-group select, .filter-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0b0c10;
+            border: 2px solid #45a29e;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+        }
+        .filter-group select:focus, .filter-group input:focus {
+            border-color: #66fcf1;
+            box-shadow: 0 0 10px #66fcf1;
+        }
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            background: #0b0c10;
+            padding: 10px 20px;
+            border-radius: 40px;
+            border: 2px solid #45a29e;
+        }
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #c5c6c7;
+            cursor: pointer;
+        }
+        .radio-group input[type="radio"] {
+            accent-color: #66fcf1;
+            width: 18px;
+            height: 18px;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+        .card {
+            background: #1f2833;
+            border-radius: 20px;
+            padding: 20px;
+            border: 2px solid #45a29e;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 252, 241, 0.3);
+            border-color: #66fcf1;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+        }
+        .card-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: #0b0c10;
+            color: #66fcf1;
+            border: 1px solid #66fcf1;
+            margin-bottom: 12px;
+        }
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .card-game {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            color: #c5c6c7;
+        }
+        .card-game img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            filter: brightness(0) invert(1);
+        }
+        .card-details {
+            margin: 12px 0;
+            font-size: 0.95rem;
+            color: #b0b0b0;
+        }
+        .card-details span {
+            color: #66fcf1;
+            font-weight: 600;
+        }
+        .card-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .tg-button {
+            background: transparent;
+            border: 2px solid #66fcf1;
+            color: #66fcf1;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            flex: 1;
+        }
+        .tg-button:hover {
+            background: #66fcf1;
+            color: #0b0c10;
+        }
+        .no-results {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.5rem;
+            color: #45a29e;
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TEAM FIND</h1>
+        <div class="filters">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>🎮 Игра</label>
+                    <select id="gameFilter">
+                        <option value="all">Все игры</option>
+                        <option value="CS2">CS2</option>
+                        <option value="Valorant">Valorant</option>
+                        <option value="Dota 2">Dota 2</option>
+                        <option value="Fortnite">Fortnite</option>
+                        <option value="LoL">League of Legends</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>🔍 Тип</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="typeFilter" value="all" checked> Все</label>
+                        <label><input type="radio" name="typeFilter" value="player"> Игроки</label>
+                        <label><input type="radio" name="typeFilter" value="team"> Команды</label>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>🏆 Роль / Ранг</label>
+                    <input type="text" id="searchText" placeholder="Например: AWPer, Gold...">
+                </div>
+            </div>
+        </div>
+        <div id="cardsContainer" class="cards-grid">
+            <!-- карточки будут сгенерированы скриптом -->
+        </div>
+    </div>
+    <script>
+        // Демо-данные (игроки и команды)
+        const data = [
+            { type: 'player', name: 's1mple', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Легендарный снайпер, ищу тиммейтов' },
+            { type: 'player', name: 'TenZ', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Ищу команду для турниров' },
+            { type: 'player', name: 'Sumail', game: 'Dota 2', role: 'Mid', rank: 'Immortal', description: 'Опытный мидер, нужен коллектив' },
+            { type: 'player', name: 'Ninja', game: 'Fortnite', role: 'Flex', rank: 'Champion', description: 'Стример, ищу пати' },
+            { type: 'player', name: 'Faker', game: 'LoL', role: 'Mid', rank: 'Challenger', description: 'Демон лейта, ищу команду' },
+            { type: 'team', name: 'NaVi', game: 'CS2', rank: 'Топ-1', members: 5, description: 'Ищем тренера и аналитика' },
+            { type: 'team', name: 'Team Liquid', game: 'Valorant', rank: 'Про', members: 5, description: 'Нужен инициатор' },
+            { type: 'team', name: 'OG', game: 'Dota 2', rank: 'Тир-1', members: 5, description: 'Ищем керри' },
+            { type: 'team', name: '100 Thieves', game: 'Fortnite', rank: 'Про', members: 4, description: 'Ищем финального игрока' },
+            { type: 'team', name: 'T1', game: 'LoL', rank: 'Топ', members: 5, description: 'Нужен саппорт' },
+            { type: 'player', name: 'ZywOo', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Молодой талант' },
+            { type: 'player', name: 'Aspas', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Бразильский дуэлист' }
+        ];
+
+        const gameFilter = document.getElementById('gameFilter');
+        const typeRadios = document.getElementsByName('typeFilter');
+        const searchText = document.getElementById('searchText');
+        const container = document.getElementById('cardsContainer');
+
+        function getGameIcon(game) {
+            // Простейшие иконки (можно заменить на реальные)
+            const icons = {
+                'CS2': '🎯',
+                'Valorant': '🔫',
+                'Dota 2': '⚔️',
+                'Fortnite': '🛸',
+                'LoL': '🏆'
+            };
+            return icons[game] || '🎮';
+        }
+
+        function renderCards() {
+            const selectedGame = gameFilter.value;
+            let selectedType = 'all';
+            for (let radio of typeRadios) {
+                if (radio.checked) {
+                    selectedType = radio.value;
+                    break;
+                }
+            }
+            const search = searchText.value.toLowerCase().trim();
+
+            const filtered = data.filter(item => {
+                if (selectedGame !== 'all' && item.game !== selectedGame) return false;
+                if (selectedType !== 'all' && item.type !== selectedType) return false;
+                if (search) {
+                    const inRole = item.role ? item.role.toLowerCase().includes(search) : false;
+                    const inRank = item.rank.toLowerCase().includes(search);
+                    const inDesc = item.description.toLowerCase().includes(search);
+                    const inName = item.name.toLowerCase().includes(search);
+                    return inRole || inRank || inDesc || inName;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="no-results">❌ Никого не найдено</div>';
+                return;
+            }
+
+            let html = '';
+            filtered.forEach(item => {
+                const isPlayer = item.type === 'player';
+                const typeLabel = isPlayer ? '👤 ИГРОК' : '👥 КОМАНДА';
+                const gameIcon = getGameIcon(item.game);
+                const details = isPlayer 
+                    ? `<div><span>Роль:</span> ${item.role}</div><div><span>Ранг:</span> ${item.rank}</div>`
+                    : `<div><span>Ранг/уровень:</span> ${item.rank}</div><div><span>Состав:</span> ${item.members}/5</div>`;
+                html += `
+                    <div class="card">
+                        <div class="card-type">${typeLabel}</div>
+                        <div class="card-title">${item.name}</div>
+                        <div class="card-game">${gameIcon} ${item.game}</div>
+                        <div class="card-details">
+                            ${details}
+                            <div style="margin-top:8px;"><span>Описание:</span> ${item.description}</div>
+                        </div>
+                        <div class="card-actions">
+                            <a href="#" class="tg-button" onclick="alert('Чат с пользователем (имитация)')">Связаться</a>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // События фильтрации
+        gameFilter.addEventListener('change', renderCards);
+        searchText.addEventListener('input', renderCards);
+        for (let radio of typeRadios) {
+            radio.addEventListener('change', renderCards);
+        }
+
+        // Первоначальный рендер
+        renderCards();
+    </script>
+</body>
+</html>
