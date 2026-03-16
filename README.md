@@ -1,2 +1,2 @@
-# Teamfindbot
+# TeamFindbot
 Telegram bot
