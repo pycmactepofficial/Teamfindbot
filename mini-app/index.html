@@ -228,23 +228,123 @@
         <div id="cardsContainer" class="cards-grid">
             <!-- карточки будут сгенерированы скриптом -->
         </div>
+        <div class="filters" style="margin-top: 30px;">
+            <h2 style="color: #fff; text-align: center; margin-bottom: 20px;">Добавить свой профиль</h2>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Тип</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="regType" value="player" checked> Игрок</label>
+                        <label><input type="radio" name="regType" value="team"> Команда</label>
+                    </div>
+                </div>
+            </div>
+            <div id="playerForm" class="filter-row">
+                <div class="filter-group">
+                    <label>Имя</label>
+                    <input type="text" id="regName" placeholder="Ваше имя">
+                </div>
+                <div class="filter-group">
+                    <label>Игра</label>
+                    <select id="regGame">
+                        <option value="CS2">CS2</option>
+                        <option value="Valorant">Valorant</option>
+                        <option value="Dota 2">Dota 2</option>
+                        <option value="Fortnite">Fortnite</option>
+                        <option value="LoL">League of Legends</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Роль</label>
+                    <input type="text" id="regRole" placeholder="AWPer, Mid...">
+                </div>
+                <div class="filter-group">
+                    <label>Ранг</label>
+                    <input type="text" id="regRank" placeholder="Global, Radiant...">
+                </div>
+                <div class="filter-group">
+                    <label>Описание</label>
+                    <input type="text" id="regDesc" placeholder="Краткое описание">
+                </div>
+            </div>
+            <div id="teamForm" class="filter-row" style="display: none;">
+                <div class="filter-group">
+                    <label>Название команды</label>
+                    <input type="text" id="teamName" placeholder="Название команды">
+                </div>
+                <div class="filter-group">
+                    <label>Игра</label>
+                    <select id="teamGame">
+                        <option value="CS2">CS2</option>
+                        <option value="Valorant">Valorant</option>
+                        <option value="Dota 2">Dota 2</option>
+                        <option value="Fortnite">Fortnite</option>
+                        <option value="LoL">League of Legends</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Ранг/уровень</label>
+                    <input type="text" id="teamRank" placeholder="Топ-1, Про...">
+                </div>
+                <div class="filter-group">
+                    <label>Участников</label>
+                    <input type="number" id="teamMembers" min="1" max="5" value="5">
+                </div>
+                <div class="filter-group">
+                    <label>Описание</label>
+                    <input type="text" id="teamDesc" placeholder="Что ищете">
+                </div>
+            </div>
+            <div class="filter-row">
+                <button id="registerBtn" class="tg-button" style="width: 100%; padding: 12px;">Зарегистрироваться</button>
+            </div>
+        </div>
     </div>
     <script>
-        // Демо-данные (игроки и команды)
-        const data = [
-            { type: 'player', name: 's1mple', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Легендарный снайпер, ищу тиммейтов' },
-            { type: 'player', name: 'TenZ', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Ищу команду для турниров' },
-            { type: 'player', name: 'Sumail', game: 'Dota 2', role: 'Mid', rank: 'Immortal', description: 'Опытный мидер, нужен коллектив' },
-            { type: 'player', name: 'Ninja', game: 'Fortnite', role: 'Flex', rank: 'Champion', description: 'Стример, ищу пати' },
-            { type: 'player', name: 'Faker', game: 'LoL', role: 'Mid', rank: 'Challenger', description: 'Демон лейта, ищу команду' },
-            { type: 'team', name: 'NaVi', game: 'CS2', rank: 'Топ-1', members: 5, description: 'Ищем тренера и аналитика' },
-            { type: 'team', name: 'Team Liquid', game: 'Valorant', rank: 'Про', members: 5, description: 'Нужен инициатор' },
-            { type: 'team', name: 'OG', game: 'Dota 2', rank: 'Тир-1', members: 5, description: 'Ищем керри' },
-            { type: 'team', name: '100 Thieves', game: 'Fortnite', rank: 'Про', members: 4, description: 'Ищем финального игрока' },
-            { type: 'team', name: 'T1', game: 'LoL', rank: 'Топ', members: 5, description: 'Нужен саппорт' },
-            { type: 'player', name: 'ZywOo', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Молодой талант' },
-            { type: 'player', name: 'Aspas', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Бразильский дуэлист' }
-        ];
+        // Демо-данные (игроки и команды) - заменено на загрузку с сервера
+        let data = [];
+
+        async function loadData() {
+            try {
+                const response = await fetch('/api/data');
+                if (response.ok) {
+                    data = await response.json();
+                } else {
+                    // Fallback to demo data if API fails
+                    data = [
+                        { type: 'player', name: 's1mple', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Легендарный снайпер, ищу тиммейтов' },
+                        { type: 'player', name: 'TenZ', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Ищу команду для турниров' },
+                        { type: 'player', name: 'Sumail', game: 'Dota 2', role: 'Mid', rank: 'Immortal', description: 'Опытный мидер, нужен коллектив' },
+                        { type: 'player', name: 'Ninja', game: 'Fortnite', role: 'Flex', rank: 'Champion', description: 'Стример, ищу пати' },
+                        { type: 'player', name: 'Faker', game: 'LoL', role: 'Mid', rank: 'Challenger', description: 'Демон лейта, ищу команду' },
+                        { type: 'team', name: 'NaVi', game: 'CS2', rank: 'Топ-1', members: 5, description: 'Ищем тренера и аналитика' },
+                        { type: 'team', name: 'Team Liquid', game: 'Valorant', rank: 'Про', members: 5, description: 'Нужен инициатор' },
+                        { type: 'team', name: 'OG', game: 'Dota 2', rank: 'Тир-1', members: 5, description: 'Ищем керри' },
+                        { type: 'team', name: '100 Thieves', game: 'Fortnite', rank: 'Про', members: 4, description: 'Ищем финального игрока' },
+                        { type: 'team', name: 'T1', game: 'LoL', rank: 'Топ', members: 5, description: 'Нужен саппорт' },
+                        { type: 'player', name: 'ZywOo', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Молодой талант' },
+                        { type: 'player', name: 'Aspas', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Бразильский дуэлист' }
+                    ];
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                // Fallback
+                data = [
+                    { type: 'player', name: 's1mple', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Легендарный снайпер, ищу тиммейтов' },
+                    { type: 'player', name: 'TenZ', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Ищу команду для турниров' },
+                    { type: 'player', name: 'Sumail', game: 'Dota 2', role: 'Mid', rank: 'Immortal', description: 'Опытный мидер, нужен коллектив' },
+                    { type: 'player', name: 'Ninja', game: 'Fortnite', role: 'Flex', rank: 'Champion', description: 'Стример, ищу пати' },
+                    { type: 'player', name: 'Faker', game: 'LoL', role: 'Mid', rank: 'Challenger', description: 'Демон лейта, ищу команду' },
+                    { type: 'team', name: 'NaVi', game: 'CS2', rank: 'Топ-1', members: 5, description: 'Ищем тренера и аналитика' },
+                    { type: 'team', name: 'Team Liquid', game: 'Valorant', rank: 'Про', members: 5, description: 'Нужен инициатор' },
+                    { type: 'team', name: 'OG', game: 'Dota 2', rank: 'Тир-1', members: 5, description: 'Ищем керри' },
+                    { type: 'team', name: '100 Thieves', game: 'Fortnite', rank: 'Про', members: 4, description: 'Ищем финального игрока' },
+                    { type: 'team', name: 'T1', game: 'LoL', rank: 'Топ', members: 5, description: 'Нужен саппорт' },
+                    { type: 'player', name: 'ZywOo', game: 'CS2', role: 'AWPer', rank: 'Global', description: 'Молодой талант' },
+                    { type: 'player', name: 'Aspas', game: 'Valorant', role: 'Duelist', rank: 'Radiant', description: 'Бразильский дуэлист' }
+                ];
+            }
+        }
 
         const gameFilter = document.getElementById('gameFilter');
         const typeRadios = document.getElementsByName('typeFilter');
@@ -274,48 +374,44 @@
             }
             const search = searchText.value.toLowerCase().trim();
 
-            const filtered = data.filter(item => {
-                if (selectedGame !== 'all' && item.game !== selectedGame) return false;
-                if (selectedType !== 'all' && item.type !== selectedType) return false;
-                if (search) {
-                    const inRole = item.role ? item.role.toLowerCase().includes(search) : false;
-                    const inRank = item.rank.toLowerCase().includes(search);
-                    const inDesc = item.description.toLowerCase().includes(search);
-                    const inName = item.name.toLowerCase().includes(search);
-                    return inRole || inRank || inDesc || inName;
-                }
-                return true;
-            });
+            // Fetch data with filters
+            fetch(`/api/data?game=${encodeURIComponent(selectedGame)}&type_filter=${encodeURIComponent(selectedType)}&search=${encodeURIComponent(search)}`)
+                .then(response => response.json())
+                .then(filtered => {
+                    if (filtered.length === 0) {
+                        container.innerHTML = '<div class="no-results">❌ Никого не найдено</div>';
+                        return;
+                    }
 
-            if (filtered.length === 0) {
-                container.innerHTML = '<div class="no-results">❌ Никого не найдено</div>';
-                return;
-            }
-
-            let html = '';
-            filtered.forEach(item => {
-                const isPlayer = item.type === 'player';
-                const typeLabel = isPlayer ? '👤 ИГРОК' : '👥 КОМАНДА';
-                const gameIcon = getGameIcon(item.game);
-                const details = isPlayer 
-                    ? `<div><span>Роль:</span> ${item.role}</div><div><span>Ранг:</span> ${item.rank}</div>`
-                    : `<div><span>Ранг/уровень:</span> ${item.rank}</div><div><span>Состав:</span> ${item.members}/5</div>`;
-                html += `
-                    <div class="card">
-                        <div class="card-type">${typeLabel}</div>
-                        <div class="card-title">${item.name}</div>
-                        <div class="card-game">${gameIcon} ${item.game}</div>
-                        <div class="card-details">
-                            ${details}
-                            <div style="margin-top:8px;"><span>Описание:</span> ${item.description}</div>
-                        </div>
-                        <div class="card-actions">
-                            <a href="#" class="tg-button" onclick="alert('Чат с пользователем (имитация)')">Связаться</a>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
+                    let html = '';
+                    filtered.forEach(item => {
+                        const isPlayer = item.type === 'player';
+                        const typeLabel = isPlayer ? '👤 ИГРОК' : '👥 КОМАНДА';
+                        const gameIcon = getGameIcon(item.game);
+                        const details = isPlayer 
+                            ? `<div><span>Роль:</span> ${item.role}</div><div><span>Ранг:</span> ${item.rank}</div>`
+                            : `<div><span>Ранг/уровень:</span> ${item.rank}</div><div><span>Состав:</span> ${item.members}/5</div>`;
+                        html += `
+                            <div class="card">
+                                <div class="card-type">${typeLabel}</div>
+                                <div class="card-title">${item.name}</div>
+                                <div class="card-game">${gameIcon} ${item.game}</div>
+                                <div class="card-details">
+                                    ${details}
+                                    <div style="margin-top:8px;"><span>Описание:</span> ${item.description}</div>
+                                </div>
+                                <div class="card-actions">
+                                    <a href="#" class="tg-button" onclick="alert('Чат с пользователем (имитация)')">Связаться</a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    container.innerHTML = '<div class="no-results">❌ Ошибка загрузки данных</div>';
+                });
         }
 
         // События фильтрации
@@ -324,6 +420,70 @@
         for (let radio of typeRadios) {
             radio.addEventListener('change', renderCards);
         }
+
+        const regTypeRadios = document.getElementsByName('regType');
+        const playerForm = document.getElementById('playerForm');
+        const teamForm = document.getElementById('teamForm');
+        const registerBtn = document.getElementById('registerBtn');
+
+        // Переключение форм
+        for (let radio of regTypeRadios) {
+            radio.addEventListener('change', () => {
+                if (radio.value === 'player') {
+                    playerForm.style.display = 'flex';
+                    teamForm.style.display = 'none';
+                } else {
+                    playerForm.style.display = 'none';
+                    teamForm.style.display = 'flex';
+                }
+            });
+        }
+
+        // Регистрация
+        registerBtn.addEventListener('click', async () => {
+            const isPlayer = document.querySelector('input[name="regType"]:checked').value === 'player';
+            let data;
+            if (isPlayer) {
+                data = {
+                    type: 'player',
+                    name: document.getElementById('regName').value,
+                    game: document.getElementById('regGame').value,
+                    role: document.getElementById('regRole').value,
+                    rank: document.getElementById('regRank').value,
+                    description: document.getElementById('regDesc').value
+                };
+            } else {
+                data = {
+                    type: 'team',
+                    name: document.getElementById('teamName').value,
+                    game: document.getElementById('teamGame').value,
+                    rank: document.getElementById('teamRank').value,
+                    members: parseInt(document.getElementById('teamMembers').value),
+                    description: document.getElementById('teamDesc').value
+                };
+            }
+
+            // В реальности нужно получить user_id из Telegram Web App API
+            // Для демо используем случайный ID
+            data.id = Math.floor(Math.random() * 1000000);
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    alert('Регистрация успешна!');
+                    renderCards(); // Обновить список
+                } else {
+                    alert('Ошибка регистрации');
+                }
+            } catch (error) {
+                console.error('Error registering:', error);
+                alert('Ошибка регистрации');
+            }
+        });
 
         // Первоначальный рендер
         renderCards();
