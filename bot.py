@@ -16,7 +16,7 @@ import usersservice
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU"
-WEB_APP_URL = "https://web-production-be2c5.up.railway.app/#"  # Замени на реальный URL Railway
+WEB_APP_URL = "https://web-production-be2c5.up.railway.app"  # Замени на реальный URL Railway
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
