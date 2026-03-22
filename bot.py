@@ -5,10 +5,11 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
+import os
 
 import usersservice
 
@@ -30,7 +31,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/", StaticFiles(directory="mini-app", html=True), name="static")
+@app.get("/")
+async def read_root():
+    return FileResponse(os.path.join("mini-app", "index.html"))
+
+# app.mount("/", StaticFiles(directory="mini-app", html=True), name="static")  # Убрал, чтобы не перекрывать routes
 
 @app.get("/api/data")
 async def get_data(game: str = "all", type_filter: str = "all", search: str = ""):
