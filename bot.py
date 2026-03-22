@@ -4,6 +4,9 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
@@ -12,7 +15,7 @@ import usersservice
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU"
-WEB_APP_URL = "http://localhost:8000"  # будет заменено на реальный URL после хостинга
+WEB_APP_URL = "https://pycmactepofficial.github.io/teamfind-miniapp/"  # будет заменено на реальный URL после хостинга
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -28,6 +31,14 @@ app.add_middleware(
 )
 
 app.mount("/", StaticFiles(directory="mini-app", html=True), name="static")
+
+@app.get("/api/data")
+async def get_data(game: str = "all", type_filter: str = "all", search: str = ""):
+    try:
+        data = usersservice.user_service.search(game=game, type_filter=type_filter, search_text=search)
+        return JSONResponse(content=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/register")
 async def register(data: dict):
@@ -94,15 +105,18 @@ async def any_message(message: types.Message):
     await message.answer("Используй /start для начала работы.")
 
 async def main():
-    # Запуск бота и сервера параллельно
+    # Запуск бота и сервера параллельно через Uvicorn Server
     from asyncio import create_task
     bot_task = create_task(dp.start_polling(bot))
-    server_task = create_task(uvicorn.run(app, host="0.0.0.0", port=8000))
+    config = uvicorn.Config(app, host="0.0.0.0", port=8081, log_level="info")
+    server = uvicorn.Server(config)
+    server_task = create_task(server.serve())
     await asyncio.gather(bot_task, server_task)
 
 async def run_server_only():
-    # Только сервер для тестирования
-    await uvicorn.run(app, host="0.0.0.0", port=8000)
+    config = uvicorn.Config(app, host="0.0.0.0", port=8081, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
 if __name__ == "__main__":
     import os
