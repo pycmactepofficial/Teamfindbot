@@ -306,7 +306,7 @@
 
         async function loadData() {
             try {
-                const response = await fetch(window.location.origin + '/api/data');
+                const response = await fetch('https://web-production-be2c5.up.railway.app/api/data');
                 if (response.ok) {
                     data = await response.json();
                 } else {
@@ -375,7 +375,7 @@
             const search = searchText.value.toLowerCase().trim();
 
             // Fetch data with filters
-            fetch(window.location.origin + `/api/data?game=${encodeURIComponent(selectedGame)}&type_filter=${encodeURIComponent(selectedType)}&search=${encodeURIComponent(search)}`)
+            fetch('https://web-production-be2c5.up.railway.app/api/data?game=' + encodeURIComponent(selectedGame) + '&type_filter=' + encodeURIComponent(selectedType) + '&search=' + encodeURIComponent(search))
                 .then(response => response.json())
                 .then(filtered => {
                     if (filtered.length === 0) {
@@ -468,7 +468,7 @@
             data.id = Math.floor(Math.random() * 1000000);
 
             try {
-                const response = await fetch(window.location.origin + '/api/register', {
+                const response = await fetch('https://web-production-be2c5.up.railway.app/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
