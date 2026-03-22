@@ -15,7 +15,7 @@ import usersservice
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU"
-WEB_APP_URL = "https://pycmactepofficial.github.io/teamfind-miniapp/"  # будет заменено на реальный URL после хостинга
+WEB_APP_URL = "https://web-production-be2c5.up.railway.app/"  # Замени на реальный URL Railway
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -108,13 +108,15 @@ async def main():
     # Запуск бота и сервера параллельно через Uvicorn Server
     from asyncio import create_task
     bot_task = create_task(dp.start_polling(bot))
-    config = uvicorn.Config(app, host="0.0.0.0", port=8081, log_level="info")
+    port = int(os.getenv("PORT", 8081))
+    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
     server_task = create_task(server.serve())
     await asyncio.gather(bot_task, server_task)
 
 async def run_server_only():
-    config = uvicorn.Config(app, host="0.0.0.0", port=8081, log_level="info")
+    port = int(os.getenv("PORT", 8081))
+    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
     await server.serve()
 
