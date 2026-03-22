@@ -40,6 +40,10 @@ async def get_data(game: str = "all", type_filter: str = "all", search: str = ""
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/test")
+async def test():
+    return {"test": "API is working"}
+
 @app.post("/api/register")
 async def register(data: dict):
     try:
@@ -108,22 +112,17 @@ async def main():
     # Запуск бота и сервера параллельно через Uvicorn Server
     from asyncio import create_task
     bot_task = create_task(dp.start_polling(bot))
-    port = int(os.getenv("PORT", 8081))
+    port = int(os.getenv("PORT", 8082))
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
     server_task = create_task(server.serve())
     await asyncio.gather(bot_task, server_task)
 
 async def run_server_only():
-    port = int(os.getenv("PORT", 8081))
+    port = int(os.getenv("PORT", 8082))
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
     await server.serve()
 
 if __name__ == "__main__":
-    import os
-    if os.getenv("PORT"):
-        # На Railway или подобных запускаем только сервер
-        uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
-    else:
-        asyncio.run(main())
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
