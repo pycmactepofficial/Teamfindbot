@@ -122,8 +122,8 @@ async def run_server_only():
 
 if __name__ == "__main__":
     import os
-    if os.getenv("RAILWAY_ENVIRONMENT"):
-        # На Railway запускаем только сервер
+    if os.getenv("PORT"):
+        # На Railway или подобных запускаем только сервер
         uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
     else:
         asyncio.run(main())
