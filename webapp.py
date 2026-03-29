@@ -33,12 +33,24 @@ async def get_data(game: str = "all", type_filter: str = "all", search: str = ""
 async def test():
     return {"test": "API is working"}
 
+@app.get("/api/user-profiles/{user_id}")
+async def get_user_profiles(user_id: int):
+    try:
+        profiles = usersservice.user_service.get_user_profiles(user_id)
+        return JSONResponse(content=profiles)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/register")
 async def register(data: dict):
     try:
+        user_id = int(data.get('user_id', 0))
+        if user_id == 0:
+            raise ValueError("user_id required")
+        
         if data['type'] == 'player':
-            usersservice.user_service.add_user(
-                user_id=data['id'],
+            result = usersservice.user_service.add_user(
+                user_id=user_id,
                 name=data['name'],
                 game=data['game'],
                 role=data['role'],
@@ -46,15 +58,42 @@ async def register(data: dict):
                 description=data['description']
             )
         else:
-            usersservice.user_service.add_team(
-                user_id=data['id'],
+            result = usersservice.user_service.add_team(
+                user_id=user_id,
                 name=data['name'],
                 game=data['game'],
                 rank=data['rank'],
                 members=data['members'],
                 description=data['description']
             )
-        return {"status": "success"}
+        return {"status": "success", **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/profile/{profile_id}")
+async def delete_profile(profile_id: int, user_id: int):
+    try:
+        success = usersservice.user_service.delete_profile(user_id, profile_id)
+        if success:
+            return {"status": "success"}
+        else:
+            raise HTTPException(status_code=404, detail="Profile not found or not owned by user")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/profile/{profile_id}")
+async def update_profile(profile_id: int, data: dict):
+    try:
+        user_id = int(data.get('user_id', 0))
+        if user_id == 0:
+            raise ValueError("user_id required")
+        
+        update_data = {k: v for k, v in data.items() if k != 'user_id'}
+        success = usersservice.user_service.update_profile(user_id, profile_id, **update_data)
+        if success:
+            return {"status": "success"}
+        else:
+            raise HTTPException(status_code=404, detail="Profile not found or not owned by user")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
