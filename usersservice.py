@@ -1,175 +1,284 @@
 
-"""Service for managing users and teams with SQLite"""
+"""Service for managing users and teams with JSON storage"""
 
-import sqlite3
-from typing import List, Dict, Optional
+import json
 import os
+from typing import List, Dict, Optional
+from datetime import datetime
 
 class UserService:
-    def __init__(self, db_file: str = "database.db"):
-        self.db_file = db_file
-        self.init_db()
+    def __init__(self, json_file: str = "users.json"):
+        self.json_file = json_file
+        self.init_json()
 
-    def init_db(self):
-        """Initialize database with tables"""
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS profiles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                type TEXT NOT NULL,
-                name TEXT NOT NULL,
-                game TEXT NOT NULL,
-                role TEXT,
-                rank TEXT NOT NULL,
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user_id, type, name)
-            )
-        ''')
-        conn.commit()
-        conn.close()
+    def init_json(self):
+        """Initialize JSON file with basic structure"""
+        if not os.path.exists(self.json_file):
+            with open(self.json_file, 'w', encoding='utf-8') as f:
+                json.dump({"users": []}, f, ensure_ascii=False, indent=2)
+
+    def _load_data(self) -> Dict:
+        """Load data from JSON file"""
+        try:
+            with open(self.json_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {"users": []}
+
+    def _save_data(self, data: Dict):
+        """Save data to JSON file"""
+        with open(self.json_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def get_user_by_chat_id(self, chat_id: int) -> Optional[Dict]:
+        """Get user data by chat_id"""
+        data = self._load_data()
+        for user in data["users"]:
+            if user["chat_id"] == chat_id:
+                return user
+        return None
+
+    def get_user_by_user_id(self, user_id: int) -> Optional[Dict]:
+        """Get user data by user_id"""
+        data = self._load_data()
+        for user in data["users"]:
+            if user.get("user_id", user["chat_id"]) == user_id:  # Fallback for old entries
+                return user
+        return None
+
+    def add_or_update_user(self, chat_id: int, user_id: int = None) -> Dict:
+        """Add new user or update existing one"""
+        data = self._load_data()
+        user = self.get_user_by_chat_id(chat_id)
+
+        if user_id is None:
+            user_id = chat_id  # For personal chats
+
+        if user is None:
+            user = {
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "profiles": [],
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            data["users"].append(user)
+        else:
+            user["user_id"] = user_id  # Update if needed
+            user["updated_at"] = datetime.now().isoformat()
+
+        self._save_data(data)
+        return user
 
     def add_user(self, user_id: int, name: str, game: str, role: str, rank: str, description: str) -> Dict:
         """Add or update player profile"""
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        try:
-            cursor.execute('''
-                INSERT INTO profiles (user_id, type, name, game, role, rank, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, 'player', name, game, role, rank, description))
-            profile_id = cursor.lastrowid
-            conn.commit()
-            return {'status': 'success', 'id': profile_id}
-        except sqlite3.IntegrityError:
-            # Update if exists
-            cursor.execute('''
-                UPDATE profiles 
-                SET game = ?, role = ?, rank = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ? AND type = ? AND name = ?
-            ''', (game, role, rank, description, user_id, 'player', name))
-            conn.commit()
-            return {'status': 'updated'}
-        finally:
-            conn.close()
+        data = self._load_data()
+        user = self.get_user_by_user_id(user_id)
+
+        if user is None:
+            # Create user if doesn't exist
+            user = {
+                "chat_id": user_id,  # Assume chat_id = user_id for personal use
+                "user_id": user_id,
+                "profiles": [],
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            data["users"].append(user)
+
+        # Check if profile already exists
+        existing_profile = None
+        for profile in user["profiles"]:
+            if profile["type"] == "player" and profile["name"] == name:
+                existing_profile = profile
+                break
+
+        if existing_profile:
+            # Update existing
+            existing_profile.update({
+                "game": game,
+                "role": role,
+                "rank": rank,
+                "description": description,
+                "updated_at": datetime.now().isoformat()
+            })
+            result = {"status": "updated", "id": existing_profile["id"]}
+        else:
+            # Create new
+            profile_id = len(user["profiles"]) + 1
+            profile = {
+                "id": profile_id,
+                "type": "player",
+                "name": name,
+                "game": game,
+                "role": role,
+                "rank": rank,
+                "description": description,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            user["profiles"].append(profile)
+            result = {"status": "success", "id": profile_id}
+
+        user["updated_at"] = datetime.now().isoformat()
+        self._save_data(data)
+        return result
 
     def add_team(self, user_id: int, name: str, game: str, rank: str, members: int, description: str) -> Dict:
         """Add or update team profile"""
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        try:
-            # Store members in description if needed or as separate field
-            full_desc = f"Состав: {members}/5\n{description}" if description else f"Состав: {members}/5"
-            cursor.execute('''
-                INSERT INTO profiles (user_id, type, name, game, rank, description)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (user_id, 'team', name, game, rank, full_desc))
-            profile_id = cursor.lastrowid
-            conn.commit()
-            return {'status': 'success', 'id': profile_id}
-        except sqlite3.IntegrityError:
-            full_desc = f"Состав: {members}/5\n{description}" if description else f"Состав: {members}/5"
-            cursor.execute('''
-                UPDATE profiles 
-                SET game = ?, rank = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ? AND type = ? AND name = ?
-            ''', (game, rank, full_desc, user_id, 'team', name))
-            conn.commit()
-            return {'status': 'updated'}
-        finally:
-            conn.close()
+        data = self._load_data()
+        user = self.get_user_by_user_id(user_id)
+
+        if user is None:
+            # Create user if doesn't exist
+            user = {
+                "chat_id": user_id,
+                "user_id": user_id,
+                "profiles": [],
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            data["users"].append(user)
+
+        # Check if team already exists
+        existing_profile = None
+        for profile in user["profiles"]:
+            if profile["type"] == "team" and profile["name"] == name:
+                existing_profile = profile
+                break
+
+        full_desc = f"Состав: {members}/5\n{description}" if description else f"Состав: {members}/5"
+
+        if existing_profile:
+            # Update existing
+            existing_profile.update({
+                "game": game,
+                "rank": rank,
+                "description": full_desc,
+                "updated_at": datetime.now().isoformat()
+            })
+            result = {"status": "updated", "id": existing_profile["id"]}
+        else:
+            # Create new
+            profile_id = len(user["profiles"]) + 1
+            profile = {
+                "id": profile_id,
+                "type": "team",
+                "name": name,
+                "game": game,
+                "rank": rank,
+                "description": full_desc,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            user["profiles"].append(profile)
+            result = {"status": "success", "id": profile_id}
+
+        user["updated_at"] = datetime.now().isoformat()
+        self._save_data(data)
+        return result
 
     def delete_profile(self, user_id: int, profile_id: int) -> bool:
         """Delete profile (only owner can delete)"""
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM profiles WHERE id = ? AND user_id = ?', (profile_id, user_id))
-        result = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
-        return result
+        data = self._load_data()
+        user = self.get_user_by_user_id(user_id)
+
+        if user is None:
+            return False
+
+        for i, profile in enumerate(user["profiles"]):
+            if profile["id"] == profile_id:
+                user["profiles"].pop(i)
+                user["updated_at"] = datetime.now().isoformat()
+                self._save_data(data)
+                return True
+
+        return False
 
     def update_profile(self, user_id: int, profile_id: int, **kwargs) -> bool:
         """Update profile fields (only owner can update)"""
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        
-        allowed_fields = {'name', 'game', 'role', 'rank', 'description'}
-        updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
-        
-        if not updates:
-            conn.close()
+        data = self._load_data()
+        user = self.get_user_by_user_id(user_id)
+
+        if user is None:
             return False
-        
-        set_clause = ', '.join([f"{k} = ?" for k in updates.keys()])
-        values = list(updates.values()) + [profile_id, user_id]
-        
-        cursor.execute(f'UPDATE profiles SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?', values)
-        result = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
-        return result
 
-    def get_user_profiles(self, user_id: int) -> List[Dict]:
+        for profile in user["profiles"]:
+            if profile["id"] == profile_id:
+                allowed_fields = {'name', 'game', 'role', 'rank', 'description'}
+                updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+
+                if updates:
+                    profile.update(updates)
+                    profile["updated_at"] = datetime.now().isoformat()
+                    user["updated_at"] = datetime.now().isoformat()
+                    self._save_data(data)
+                    return True
+
+        return False
+
+    def get_user_profiles(self, chat_id: int) -> List[Dict]:
         """Get all profiles created by user"""
-        conn = sqlite3.connect(self.db_file)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM profiles WHERE user_id = ? ORDER BY created_at DESC', (user_id,))
-        rows = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in rows]
+        user = self.get_user_by_user_id(user_id)
+        if user is None:
+            return []
+        return user["profiles"]
 
-    def get_profile_by_id(self, profile_id: int, user_id: int) -> Optional[Dict]:
+    def get_profile_by_id(self, user_id: int, profile_id: int) -> Optional[Dict]:
         """Get specific profile (verify ownership)"""
-        conn = sqlite3.connect(self.db_file)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM profiles WHERE id = ? AND user_id = ?', (profile_id, user_id))
-        row = cursor.fetchone()
-        conn.close()
-        return dict(row) if row else None
+        user = self.get_user_by_user_id(user_id)
+        if user is None:
+            return None
+
+        for profile in user["profiles"]:
+            if profile["id"] == profile_id:
+                return profile
+
+        return None
 
     def get_all_data(self) -> List[Dict]:
         """Get all profiles for public search"""
-        conn = sqlite3.connect(self.db_file)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, type, name, game, role, rank, description FROM profiles ORDER BY updated_at DESC')
-        rows = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in rows]
+        data = self._load_data()
+        result = []
+        for user in data["users"]:
+            for profile in user["profiles"]:
+                # Add chat_id for ownership verification
+                profile_copy = profile.copy()
+                profile_copy["chat_id"] = user["chat_id"]
+                result.append(profile_copy)
+        return result
 
     def search(self, game: Optional[str] = None, type_filter: Optional[str] = None, search_text: Optional[str] = None) -> List[Dict]:
         """Search profiles"""
-        conn = sqlite3.connect(self.db_file)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        query = 'SELECT id, type, name, game, role, rank, description FROM profiles WHERE 1=1'
-        params = []
-        
-        if game and game != 'all':
-            query += ' AND game = ?'
-            params.append(game)
-        
-        if type_filter and type_filter != 'all':
-            query += ' AND type = ?'
-            params.append(type_filter)
-        
-        if search_text:
-            query += ' AND (role LIKE ? OR rank LIKE ? OR description LIKE ? OR name LIKE ?)'
-            search_pattern = f'%{search_text}%'
-            params.extend([search_pattern] * 4)
-        
-        query += ' ORDER BY updated_at DESC'
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
-        return [dict(row) for row in rows]
+        all_data = self.get_all_data()
+        result = []
+
+        for item in all_data:
+            # Filter by game
+            if game and game != 'all' and item.get('game') != game:
+                continue
+
+            # Filter by type
+            if type_filter and type_filter != 'all' and item.get('type') != type_filter:
+                continue
+
+            # Filter by search text
+            if search_text:
+                search_lower = search_text.lower()
+                searchable_fields = [
+                    item.get('name', ''),
+                    item.get('role', ''),
+                    item.get('rank', ''),
+                    item.get('description', '')
+                ]
+                if not any(search_lower in field.lower() for field in searchable_fields if field):
+                    continue
+
+            result.append(item)
+
+        # Sort by updated_at (most recent first)
+        result.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+        return result
 
 # Global instance
 user_service = UserService()

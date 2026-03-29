@@ -6,17 +6,24 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 import usersservice
+import json
 
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
-WEB_APP_URL = os.getenv("WEB_APP_URL", "http://localhost:8000/")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.app")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    user_id = message.from_user.id
+    chat_id = message.chat.id
+
+    # Check and add/update user in JSON
+    user_data = usersservice.user_service.add_or_update_user(chat_id, user_id)
+
     text = (
         "👋 Добро пожаловать в **Team Find**!\n\n"
         "Здесь ты можешь найти команду для киберспорта или набрать игроков в свой состав.\n\n"
