@@ -256,11 +256,15 @@
                 </div>
                 <div class="filter-group">
                     <label>Роль</label>
-                    <input type="text" id="regRole" placeholder="AWPer, Mid...">
+                    <select id="regRole">
+                        <!-- Опции будут заполнены JS -->
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Ранг</label>
-                    <input type="text" id="regRank" placeholder="Global, Radiant...">
+                    <select id="regRank">
+                        <!-- Опции будут заполнены JS -->
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Описание</label>
@@ -284,7 +288,9 @@
                 </div>
                 <div class="filter-group">
                     <label>Ранг/уровень</label>
-                    <input type="text" id="teamRank" placeholder="Топ-1, Про...">
+                    <select id="teamRank">
+                        <!-- Опции будут заполнены JS -->
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>Участников</label>
@@ -303,6 +309,72 @@
     <script>
         // Демо-данные (игроки и команды) - заменено на загрузку с сервера
         let data = [];
+
+        // Данные для ролей и рангов по играм
+        const gameData = {
+            'CS2': {
+                roles: ['AWPer', 'Rifler', 'IGL', 'Support', 'Lurker'],
+                ranks: ['Silver', 'Gold', 'Master Guardian', 'Distinguished Master Guardian', 'Legendary Eagle', 'Supreme', 'Global Elite']
+            },
+            'Valorant': {
+                roles: ['Duelist', 'Controller', 'Initiator', 'Sentinel'],
+                ranks: ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ascendant', 'Immortal', 'Radiant']
+            },
+            'Dota 2': {
+                roles: ['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'],
+                ranks: ['Herald', 'Guardian', 'Crusader', 'Archon', 'Legend', 'Ancient', 'Divine', 'Immortal']
+            },
+            'Fortnite': {
+                roles: ['Builder', 'Shooter', 'Flex'],
+                ranks: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Elite', 'Champion', 'Unreal']
+            },
+            'LoL': {
+                roles: ['Top', 'Jungle', 'Mid', 'ADC', 'Support'],
+                ranks: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Grandmaster', 'Challenger']
+            }
+        };
+
+        function updateRoleOptions(game, selectId) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '';
+            const roles = gameData[game].roles;
+            roles.forEach(role => {
+                const option = document.createElement('option');
+                option.value = role;
+                option.textContent = role;
+                select.appendChild(option);
+            });
+        }
+
+        function updateRankOptions(game, selectId) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '';
+            const ranks = gameData[game].ranks;
+            ranks.forEach(rank => {
+                const option = document.createElement('option');
+                option.value = rank;
+                option.textContent = rank;
+                select.appendChild(option);
+            });
+        }
+
+        // Инициализация опций при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            const defaultGame = 'CS2';
+            updateRoleOptions(defaultGame, 'regRole');
+            updateRankOptions(defaultGame, 'regRank');
+            updateRankOptions(defaultGame, 'teamRank');
+
+            // Event listeners для изменения игры
+            document.getElementById('regGame').addEventListener('change', (e) => {
+                updateRoleOptions(e.target.value, 'regRole');
+                updateRankOptions(e.target.value, 'regRank');
+            });
+
+            document.getElementById('teamGame').addEventListener('change', (e) => {
+                updateRankOptions(e.target.value, 'teamRank');
+            });
+        });
 
         async function loadData() {
             try {
