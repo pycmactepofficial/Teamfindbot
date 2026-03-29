@@ -10,7 +10,7 @@ import usersservice
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
-WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.app/")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "http://localhost:8000/")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
