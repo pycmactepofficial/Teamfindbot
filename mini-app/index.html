@@ -213,11 +213,11 @@
                 </div>
                 <div class="filter-group">
                     <label>🔍 Тип</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="typeFilter" value="all" checked> Все</label>
-                        <label><input type="radio" name="typeFilter" value="player"> Игроки</label>
-                        <label><input type="radio" name="typeFilter" value="team"> Команды</label>
-                    </div>
+                    <select id="typeFilter">
+                        <option value="all">Все</option>
+                        <option value="player">Игроки</option>
+                        <option value="team">Команды</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label>🏆 Роль / Ранг</label>
@@ -419,7 +419,7 @@
         }
 
         const gameFilter = document.getElementById('gameFilter');
-        const typeRadios = document.getElementsByName('typeFilter');
+        const typeFilter = document.getElementById('typeFilter');
         const searchText = document.getElementById('searchText');
         const container = document.getElementById('cardsContainer');
 
@@ -437,13 +437,7 @@
 
         function renderCards() {
             const selectedGame = gameFilter.value;
-            let selectedType = 'all';
-            for (let radio of typeRadios) {
-                if (radio.checked) {
-                    selectedType = radio.value;
-                    break;
-                }
-            }
+            const selectedType = typeFilter.value;
             const search = searchText.value.toLowerCase().trim();
 
             // Fetch data with filters
@@ -488,10 +482,8 @@
 
         // События фильтрации
         gameFilter.addEventListener('change', renderCards);
+        typeFilter.addEventListener('change', renderCards);
         searchText.addEventListener('input', renderCards);
-        for (let radio of typeRadios) {
-            radio.addEventListener('change', renderCards);
-        }
 
         const regTypeRadios = document.getElementsByName('regType');
         const playerForm = document.getElementById('playerForm');
