@@ -869,7 +869,37 @@
             loadSearch();
         });
     </script>
-    
+    <script>
+    (function() {
+        // Форсируем фокус и скролл для всех полей
+        const inputs = document.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            input.addEventListener('click', (e) => {
+                e.stopPropagation();
+                input.focus();
+                setTimeout(() => {
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 200);
+            });
+            // Для touch-устройств
+            input.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                input.focus();
+            });
+        });
+        
+        // Если после отправки формы список пуст — перезагрузим страницу
+        const originalLoad = loadMyProfiles;
+        window.loadMyProfiles = async function() {
+            await originalLoad();
+            const container = document.getElementById('myProfilesContainer');
+            if (container && container.innerHTML.includes('У вас нет анкет') && window.localStorage.getItem('justCreated') === 'true') {
+                // Возможно, данные ещё не записались — перезагрузим через секунду
+                setTimeout(() => location.reload(), 1000);
+            }
+        };
+    })();
+    </script>
 </body>
 
 </html>
