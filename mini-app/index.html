@@ -538,73 +538,43 @@
         let currentUserId = null;
         let currentType = 'player';
 
-        // ===== ПОЛУЧЕНИЕ ID =====
+        // ===== ИНИЦИАЛИЗАЦИЯ ID =====
         function initUserId() {
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 tg.ready();
                 currentUserId = tg.initDataUnsafe?.user?.id;
                 if (currentUserId) {
-                    alert(`✅ ID получен: ${currentUserId}`);
+                    console.log('✅ ID пользователя:', currentUserId);
                 } else {
-                    alert('⚠️ Не удалось получить ID из Telegram. Работаем в тестовом режиме?');
-                    currentUserId = 123456789; // заглушка для теста
+                    console.warn('⚠️ ID не получен, используем тестовый 123');
+                    currentUserId = 123;
                 }
             } else {
-                alert('⚠️ Запущено вне Telegram. Используем тестовый ID.');
-                currentUserId = 123456789;
+                console.warn('⚠️ Не в Telegram, тестовый ID 123');
+                currentUserId = 123;
             }
         }
 
-        // ===== ИНИЦИАЛИЗАЦИЯ ФОРМ =====
-        function initializeFormFields() {
-            const defaultGame = 'CS2';
-            updateRoleOptions(defaultGame, 'regRole');
-            updateRankOptions(defaultGame, 'regRank');
-            updateRankOptions(defaultGame, 'teamRank');
-
+        // ===== ЗАПОЛНЕНИЕ ВЫПАДАЮЩИХ СПИСКОВ =====
+        function populateGames() {
             const regGame = document.getElementById('regGame');
-            regGame.innerHTML = '';
-            for (let g in gameData) {
-                let opt = document.createElement('option');
-                opt.value = g;
-                opt.textContent = g;
-                regGame.appendChild(opt);
-            }
-            regGame.value = defaultGame;
-            regGame.addEventListener('change', (e) => {
-                updateRoleOptions(e.target.value, 'regRole');
-                updateRankOptions(e.target.value, 'regRank');
-            });
-
             const teamGame = document.getElementById('teamGame');
+            regGame.innerHTML = '';
             teamGame.innerHTML = '';
             for (let g in gameData) {
-                let opt = document.createElement('option');
-                opt.value = g;
-                opt.textContent = g;
-                teamGame.appendChild(opt);
+                let opt1 = new Option(g, g);
+                let opt2 = new Option(g, g);
+                regGame.appendChild(opt1);
+                teamGame.appendChild(opt2);
             }
-            teamGame.value = defaultGame;
-            teamGame.addEventListener('change', (e) => {
-                updateRankOptions(e.target.value, 'teamRank');
-            });
-
-            document.getElementById('gameFilter').addEventListener('change', loadSearch);
-            document.getElementById('typeFilter').addEventListener('change', loadSearch);
-            document.getElementById('searchText').addEventListener('input', loadSearch);
-            document.getElementById('regForm').addEventListener('submit', registerProfile);
-            document.getElementById('editForm').addEventListener('submit', updateProfile);
         }
 
         function updateRoleOptions(game, selectId) {
             const select = document.getElementById(selectId);
             select.innerHTML = '';
             gameData[game].roles.forEach(role => {
-                const option = document.createElement('option');
-                option.value = role;
-                option.textContent = role;
-                select.appendChild(option);
+                select.appendChild(new Option(role, role));
             });
         }
 
@@ -612,56 +582,135 @@
             const select = document.getElementById(selectId);
             select.innerHTML = '';
             gameData[game].ranks.forEach(rank => {
-                const option = document.createElement('option');
-                option.value = rank;
-                option.textContent = rank;
-                select.appendChild(option);
+                select.appendChild(new Option(rank, rank));
             });
         }
 
-        // ===== ВКЛАДКИ =====
-        function switchTab(e, tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            if (e) e.target.classList.add('active');
-            if (tabName === 'my-profiles') loadMyProfiles();
-            else if (tabName === 'search') loadSearch();
-        }
-
-        // ===== ВЫБОР ТИПА =====
+        // ===== ПЕРЕКЛЮЧЕНИЕ ТИПА (игрок/команда) с управлением required =====
         function selectType(e, type) {
             currentType = type;
             document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
             
-            const playerFields = document.getElementById('playerFields');
-            const teamFields = document.getElementById('teamFields');
+            const playerDiv = document.getElementById('playerFields');
+            const teamDiv = document.getElementById('teamFields');
             const regName = document.getElementById('regName');
             const teamName = document.getElementById('teamName');
             
             if (type === 'player') {
-                playerFields.style.display = 'block';
-                teamFields.style.display = 'none';
-                regName.required = true;      // Ник игрока обязателен
-                teamName.required = false;    // Название команды необязательно
-                teamName.value = '';          // Очищаем скрытое поле
+                playerDiv.style.display = 'block';
+                teamDiv.style.display = 'none';
+                regName.required = true;
+                teamName.required = false;
+                teamName.value = '';
             } else {
-                playerFields.style.display = 'none';
-                teamFields.style.display = 'block';
-                regName.required = false;     // Ник игрока необязателен
-                teamName.required = true;     // Название команды обязательно
-                regName.value = '';           // Очищаем скрытое поле
+                playerDiv.style.display = 'none';
+                teamDiv.style.display = 'block';
+                regName.required = false;
+                teamName.required = true;
+                regName.value = '';
             }
         }
 
-        // ===== ЗАГРУЗКА ПОИСКА =====
+        // ===== РЕГИСТРАЦИЯ (отправка на бэкенд) =====
+        async function registerProfile(e) {
+            e.preventDefault();
+            
+            if (!currentUserId) {
+                alert('❌ Ошибка: нет ID пользователя. Перезагрузите страницу.');
+                return;
+            }
+            
+            let data;
+            if (currentType === 'player') {
+                const name = document.getElementById('regName').value.trim();
+                if (!name) {
+                    alert('Введите ник игрока');
+                    return;
+                }
+                data = {
+                    user_id: currentUserId,
+                    type: 'player',
+                    name: name,
+                    game: document.getElementById('regGame').value,
+                    role: document.getElementById('regRole').value,
+                    rank: document.getElementById('regRank').value,
+                    description: document.getElementById('regDesc').value
+                };
+            } else {
+                const name = document.getElementById('teamName').value.trim();
+                if (!name) {
+                    alert('Введите название команды');
+                    return;
+                }
+                data = {
+                    user_id: currentUserId,
+                    type: 'team',
+                    name: name,
+                    game: document.getElementById('teamGame').value,
+                    rank: document.getElementById('teamRank').value,
+                    members: parseInt(document.getElementById('teamMembers').value),
+                    description: document.getElementById('regDesc').value
+                };
+            }
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    alert('✅ Анкета создана!');
+                    document.getElementById('regForm').reset();
+                    // Восстанавливаем required после сброса
+                    if (currentType === 'player') {
+                        document.getElementById('regName').required = true;
+                        document.getElementById('teamName').required = false;
+                    } else {
+                        document.getElementById('regName').required = false;
+                        document.getElementById('teamName').required = true;
+                    }
+                    loadMyProfiles();
+                    switchTab(null, 'my-profiles');
+                } else {
+                    alert('❌ Ошибка сервера: ' + (result.detail || 'Неизвестная ошибка'));
+                }
+            } catch (err) {
+                alert('❌ Ошибка запроса: ' + err.message);
+            }
+        }
+
+        // ===== ЗАГРУЗКА МОИХ АНКЕТ =====
+        async function loadMyProfiles() {
+            if (!currentUserId) {
+                document.getElementById('myProfilesContainer').innerHTML = '<div class="no-results">❌ Нет ID пользователя</div>';
+                return;
+            }
+            try {
+                const response = await fetch(`/api/user-profiles/${currentUserId}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const profiles = await response.json();
+                const container = document.getElementById('myProfilesContainer');
+                if (!profiles || profiles.length === 0) {
+                    container.innerHTML = '<div class="no-results">📭 У вас нет анкет. Создайте первую!</div>';
+                    return;
+                }
+                container.innerHTML = profiles.map(p => createCard(p, true)).join('');
+            } catch (err) {
+                alert('Ошибка загрузки моих анкет: ' + err.message);
+            }
+        }
+
+        // ===== ПОИСК =====
         async function loadSearch() {
             const game = document.getElementById('gameFilter').value;
             const type = document.getElementById('typeFilter').value;
             const search = document.getElementById('searchText').value;
             try {
                 const response = await fetch(`/api/data?game=${encodeURIComponent(game)}&type_filter=${encodeURIComponent(type)}&search=${encodeURIComponent(search)}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 const container = document.getElementById('cardsContainer');
                 if (!data || data.length === 0) {
@@ -669,29 +718,20 @@
                     return;
                 }
                 container.innerHTML = data.map(item => createCard(item, false)).join('');
-            } catch (error) {
-                alert('Ошибка загрузки поиска: ' + error.message);
+            } catch (err) {
+                alert('Ошибка поиска: ' + err.message);
             }
         }
 
-        async function loadMyProfiles() {
-            const profiles = await getProfilesFromCloud();
-            const container = document.getElementById('myProfilesContainer');
-            
-            if (!profiles || profiles.length === 0) {
-                container.innerHTML = '<div class="no-results">📭 У вас нет анкет. Создайте первую!</div>';
-                return;
-            }
-            
-            // Отображаем анкеты
-            container.innerHTML = profiles.map(profile => createCard(profile, true)).join('');
-        }
-
+        // ===== СОЗДАНИЕ КАРТОЧКИ =====
         function createCard(item, isOwn) {
             const isPlayer = item.type === 'player';
             const typeLabel = isPlayer ? '👤 ИГРОК' : '👥 КОМАНДА';
-            const gameIcon = { 'CS2': '🎯', 'Valorant': '🔫', 'Dota 2': '⚔️', 'Fortnite': '🛸', 'LoL': '🏆' }[item.game] || '🎮';
-            let details = isPlayer ? `<div><span>Роль:</span> ${item.role || 'N/A'}</div><div><span>Ранг:</span> ${item.rank}</div>` : `<div><span>Ранг:</span> ${item.rank}</div>`;
+            const icons = { 'CS2':'🎯','Valorant':'🔫','Dota 2':'⚔️','Fortnite':'🛸','LoL':'🏆' };
+            const gameIcon = icons[item.game] || '🎮';
+            let details = isPlayer ? 
+                `<div><span>Роль:</span> ${item.role || 'N/A'}</div><div><span>Ранг:</span> ${item.rank}</div>` : 
+                `<div><span>Ранг:</span> ${item.rank}</div>`;
             let actions = '';
             if (isOwn) {
                 actions = `
@@ -710,99 +750,6 @@
                     <div class="card-actions">${actions}</div>
                 </div>
             `;
-        }
-
-        // Функция для сохранения анкеты
-        async function saveProfileToCloud(profile) {
-            if (!window.Telegram.WebApp) return false;
-            try {
-                let profiles = await getProfilesFromCloud();
-                if (!profiles) profiles = [];
-                
-                // Добавляем ID и дату
-                profile.id = Date.now();
-                profile.createdAt = new Date().toISOString();
-                profiles.push(profile);
-                
-                const profilesJson = JSON.stringify(profiles);
-                return new Promise((resolve) => {
-                    window.Telegram.WebApp.CloudStorage.setItem('user_profiles', profilesJson, (success) => {
-                        resolve(success);
-                    });
-                });
-            } catch(e) {
-                console.error('CloudStorage save error:', e);
-                return false;
-            }
-        }
-
-        // Функция для загрузки анкет
-        async function getProfilesFromCloud() {
-            if (!window.Telegram.WebApp) return [];
-            return new Promise((resolve) => {
-                window.Telegram.WebApp.CloudStorage.getItem('user_profiles', (err, value) => {
-                    if (err || !value) return resolve([]);
-                    try {
-                        resolve(JSON.parse(value));
-                    } catch(e) {
-                        resolve([]);
-                    }
-                });
-            });
-        }
-
-        // ===== РЕГИСТРАЦИЯ (основное) =====
-        async function registerProfile(e) {
-            e.preventDefault();
-            
-            if (!currentUserId) {
-                alert('❌ Ошибка: не удалось определить ID пользователя. Откройте через Telegram.');
-                return;
-            }
-
-            let data;
-            if (currentType === 'player') {
-                const name = document.getElementById('regName').value;
-                if (!name) { alert('Введите ник игрока'); return; }
-                data = {
-                    user_id: currentUserId,
-                    type: 'player',
-                    name: name,
-                    game: document.getElementById('regGame').value,
-                    role: document.getElementById('regRole').value,
-                    rank: document.getElementById('regRank').value,
-                    description: document.getElementById('regDesc').value
-                };
-                const saved = await saveProfileToCloud(data);
-                if (saved) {
-                    alert('✅ Анкета создана!');
-                    document.getElementById('regForm').reset();
-                    await loadMyProfiles(); // Обновляем список
-                } else {
-                    alert('❌ Ошибка при сохранении');
-                }
-            } else {
-                const name = document.getElementById('teamName').value;
-                if (!name) { alert('Введите название команды'); return; }
-                data = {
-                    user_id: currentUserId,
-                    type: 'team',
-                    name: name,
-                    game: document.getElementById('teamGame').value,
-                    rank: document.getElementById('teamRank').value,
-                    members: parseInt(document.getElementById('teamMembers').value),
-                    description: document.getElementById('regDesc').value
-                };
-                const saved = await saveProfileToCloud(data);
-                if (saved) {
-                    alert('✅ Анкета создана!');
-                    document.getElementById('regForm').reset();
-                    await loadMyProfiles(); // Обновляем список
-                } else {
-                    alert('❌ Ошибка при сохранении');
-                }
-            }
-
         }
 
         // ===== РЕДАКТИРОВАНИЕ =====
@@ -834,14 +781,14 @@
                     body: JSON.stringify(data)
                 });
                 if (response.ok) {
-                    alert('✅ Анкета обновлена!');
+                    alert('✅ Анкета обновлена');
                     closeEditModal();
                     loadMyProfiles();
                 } else {
                     alert('❌ Ошибка обновления');
                 }
-            } catch (error) {
-                alert('Ошибка: ' + error.message);
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
             }
         }
 
@@ -855,28 +802,70 @@
                 } else {
                     alert('❌ Ошибка удаления');
                 }
-            } catch (error) {
-                alert('Ошибка: ' + error.message);
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
             }
         }
 
-        // ===== СТАРТ =====
+        // ===== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК =====
+        function switchTab(e, tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            if (e) e.target.classList.add('active');
+            if (tabName === 'my-profiles') loadMyProfiles();
+            if (tabName === 'search') loadSearch();
+        }
+
+        // ===== ОБРАБОТЧИКИ ПОЛЕЙ ВВОДА ДЛЯ ПРОКРУТКИ (решает проблему с клавиатурой) =====
+        function fixInputFocus() {
+            const inputs = document.querySelectorAll('input, select, textarea');
+            inputs.forEach(input => {
+                input.addEventListener('focus', () => {
+                    setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+                });
+                // Для touch устройств
+                input.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                    input.focus();
+                });
+            });
+        }
+
+        // ===== ЗАПУСК =====
         document.addEventListener('DOMContentLoaded', () => {
             initUserId();
-            initializeFormFields();
-            // Устанавливаем начальный тип "player" и корректные required
-            const defaultTabBtn = document.querySelector('.type-btn.active');
-            if (defaultTabBtn) {
-                selectType({ target: defaultTabBtn }, 'player');
-            } else {
-                selectType({ target: document.querySelector('.type-btn') }, 'player');
-            }
+            populateGames();
+            // Установка значений по умолчанию
+            const defaultGame = 'CS2';
+            updateRoleOptions(defaultGame, 'regRole');
+            updateRankOptions(defaultGame, 'regRank');
+            updateRankOptions(defaultGame, 'teamRank');
+            document.getElementById('regGame').value = defaultGame;
+            document.getElementById('teamGame').value = defaultGame;
+            // События смены игры
+            document.getElementById('regGame').addEventListener('change', (e) => {
+                updateRoleOptions(e.target.value, 'regRole');
+                updateRankOptions(e.target.value, 'regRank');
+            });
+            document.getElementById('teamGame').addEventListener('change', (e) => {
+                updateRankOptions(e.target.value, 'teamRank');
+            });
+            // Фильтры поиска
+            document.getElementById('gameFilter').addEventListener('change', loadSearch);
+            document.getElementById('typeFilter').addEventListener('change', loadSearch);
+            document.getElementById('searchText').addEventListener('input', loadSearch);
+            // Формы
+            document.getElementById('regForm').addEventListener('submit', registerProfile);
+            document.getElementById('editForm').addEventListener('submit', updateProfile);
+            // Установка начального типа "player"
+            const defaultBtn = document.querySelector('.type-btn.active');
+            if (defaultBtn) selectType({ target: defaultBtn }, 'player');
+            else selectType({ target: document.querySelector('.type-btn') }, 'player');
+            // Фикс полей ввода
+            fixInputFocus();
+            // Загружаем данные
             loadSearch();
-        });
-
-        // закрыть модалку по клику на фон
-        document.addEventListener('click', (e) => {
-            if (e.target === document.getElementById('editModal')) closeEditModal();
         });
     </script>
     <script>
