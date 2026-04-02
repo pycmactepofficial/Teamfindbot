@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <title>Team Find</title>
     <style>
         * {
@@ -524,8 +525,8 @@
                 tg.ready(); // Важно вызвать ready()
                 currentUserId = tg.initDataUnsafe?.user?.id;
                 if (!currentUserId) {
-                    currentUserId = Math.floor(Math.random() * 1000000);
-                    console.log('Demo mode, using random ID:', currentUserId);
+                    alert('Откройте приложение через Telegram!');
+                    throw new Error('No Telegram user ID');
                 } else {
                     console.log('Telegram user ID:', currentUserId);
                 }

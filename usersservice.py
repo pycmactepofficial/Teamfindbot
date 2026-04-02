@@ -217,8 +217,8 @@ class UserService:
 
         return False
 
-    def get_user_profiles(self, chat_id: int) -> List[Dict]:
-        """Get all profiles created by user"""
+    def get_user_profiles(self, user_id: int) -> List[Dict]:
+        """Get all profiles created by user (by user_id, not chat_id)"""
         user = self.get_user_by_user_id(user_id)
         if user is None:
             return []
@@ -229,11 +229,9 @@ class UserService:
         user = self.get_user_by_user_id(user_id)
         if user is None:
             return None
-
         for profile in user["profiles"]:
             if profile["id"] == profile_id:
                 return profile
-
         return None
 
     def get_all_data(self) -> List[Dict]:
