@@ -526,6 +526,20 @@
     </div>
 
     <script>
+        // Это решит проблему с клавиатурой
+        function onInputFocus(event) {
+            const element = event.target;
+            setTimeout(() => {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+
+        document.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('focus', onInputFocus);
+        });
+    </script>
+
+    <script>
         // ===== ДАННЫЕ =====
         const gameData = {
             'CS2': { roles: ['AWPer', 'Rifler', 'IGL', 'Support', 'Lurker'], ranks: ['Silver', 'Gold', 'Master Guardian', 'Distinguished Master Guardian', 'Legendary Eagle', 'Supreme', 'Global Elite'] },
@@ -675,19 +689,16 @@
         }
 
         async function loadMyProfiles() {
-            if (!currentUserId) { alert('Нет user ID'); return; }
-            try {
-                const response = await fetch(`/api/user-profiles/${currentUserId}`);
-                const profiles = await response.json();
-                const container = document.getElementById('myProfilesContainer');
-                if (!profiles || profiles.length === 0) {
-                    container.innerHTML = '<div class="no-results">📭 У вас нет анкет. Создайте первую!</div>';
-                    return;
-                }
-                container.innerHTML = profiles.map(profile => createCard(profile, true)).join('');
-            } catch (error) {
-                alert('Ошибка загрузки моих анкет: ' + error.message);
+            const profiles = await getProfilesFromCloud();
+            const container = document.getElementById('myProfilesContainer');
+            
+            if (!profiles || profiles.length === 0) {
+                container.innerHTML = '<div class="no-results">📭 У вас нет анкет. Создайте первую!</div>';
+                return;
             }
+            
+            // Отображаем анкеты
+            container.innerHTML = profiles.map(profile => createCard(profile, true)).join('');
         }
 
         function createCard(item, isOwn) {
@@ -715,6 +726,45 @@
             `;
         }
 
+        // Функция для сохранения анкеты
+        async function saveProfileToCloud(profile) {
+            if (!window.Telegram.WebApp) return false;
+            try {
+                let profiles = await getProfilesFromCloud();
+                if (!profiles) profiles = [];
+                
+                // Добавляем ID и дату
+                profile.id = Date.now();
+                profile.createdAt = new Date().toISOString();
+                profiles.push(profile);
+                
+                const profilesJson = JSON.stringify(profiles);
+                return new Promise((resolve) => {
+                    window.Telegram.WebApp.CloudStorage.setItem('user_profiles', profilesJson, (success) => {
+                        resolve(success);
+                    });
+                });
+            } catch(e) {
+                console.error('CloudStorage save error:', e);
+                return false;
+            }
+        }
+
+        // Функция для загрузки анкет
+        async function getProfilesFromCloud() {
+            if (!window.Telegram.WebApp) return [];
+            return new Promise((resolve) => {
+                window.Telegram.WebApp.CloudStorage.getItem('user_profiles', (err, value) => {
+                    if (err || !value) return resolve([]);
+                    try {
+                        resolve(JSON.parse(value));
+                    } catch(e) {
+                        resolve([]);
+                    }
+                });
+            });
+        }
+
         // ===== РЕГИСТРАЦИЯ (основное) =====
         async function registerProfile(e) {
             e.preventDefault();
@@ -737,6 +787,14 @@
                     rank: document.getElementById('regRank').value,
                     description: document.getElementById('regDesc').value
                 };
+                const saved = await saveProfileToCloud(data);
+                if (saved) {
+                    alert('✅ Анкета создана!');
+                    document.getElementById('regForm').reset();
+                    await loadMyProfiles(); // Обновляем список
+                } else {
+                    alert('❌ Ошибка при сохранении');
+                }
             } else {
                 const name = document.getElementById('teamName').value;
                 if (!name) { alert('Введите название команды'); return; }
@@ -749,35 +807,16 @@
                     members: parseInt(document.getElementById('teamMembers').value),
                     description: document.getElementById('regDesc').value
                 };
-            }
-
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
+                const saved = await saveProfileToCloud(data);
+                if (saved) {
                     alert('✅ Анкета создана!');
                     document.getElementById('regForm').reset();
-                    // После сброса формы восстанавливаем required в соответствии с текущим типом
-                    if (currentType === 'player') {
-                        document.getElementById('regName').required = true;
-                        document.getElementById('teamName').required = false;
-                    } else {
-                        document.getElementById('regName').required = false;
-                        document.getElementById('teamName').required = true;
-                    }
-                    loadMyProfiles();
-                    switchTab(null, 'my-profiles');
+                    await loadMyProfiles(); // Обновляем список
                 } else {
-                    const errorText = await response.text();
-                    alert('❌ Ошибка сервера: ' + errorText);
+                    alert('❌ Ошибка при сохранении');
                 }
-            } catch (error) {
-                alert('❌ Ошибка при отправке: ' + error.message);
             }
+
         }
 
         // ===== РЕДАКТИРОВАНИЕ =====
