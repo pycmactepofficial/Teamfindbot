@@ -634,16 +634,24 @@
             currentType = type;
             document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
+            
+            const playerFields = document.getElementById('playerFields');
+            const teamFields = document.getElementById('teamFields');
+            const regName = document.getElementById('regName');
+            const teamName = document.getElementById('teamName');
+            
             if (type === 'player') {
-                document.getElementById('playerFields').style.display = 'block';
-                document.getElementById('teamFields').style.display = 'none';
-                document.getElementById('regName').required = true;
-                document.getElementById('teamName').required = false;
+                playerFields.style.display = 'block';
+                teamFields.style.display = 'none';
+                regName.required = true;      // Ник игрока обязателен
+                teamName.required = false;    // Название команды необязательно
+                teamName.value = '';          // Очищаем скрытое поле
             } else {
-                document.getElementById('playerFields').style.display = 'none';
-                document.getElementById('teamFields').style.display = 'block';
-                document.getElementById('regName').required = false;
-                document.getElementById('teamName').required = true;
+                playerFields.style.display = 'none';
+                teamFields.style.display = 'block';
+                regName.required = false;     // Ник игрока необязателен
+                teamName.required = true;     // Название команды обязательно
+                regName.value = '';           // Очищаем скрытое поле
             }
         }
 
@@ -710,49 +718,38 @@
         // ===== РЕГИСТРАЦИЯ (основное) =====
         async function registerProfile(e) {
             e.preventDefault();
-            alert('1. Функция registerProfile вызвана');
-
+            
             if (!currentUserId) {
-                alert('❌ Ошибка: нет currentUserId. Перезагрузите страницу.');
+                alert('❌ Ошибка: не удалось определить ID пользователя. Откройте через Telegram.');
                 return;
             }
 
             let data;
             if (currentType === 'player') {
                 const name = document.getElementById('regName').value;
-                const game = document.getElementById('regGame').value;
-                const role = document.getElementById('regRole').value;
-                const rank = document.getElementById('regRank').value;
-                const desc = document.getElementById('regDesc').value;
-                if (!name) { alert('Введите ник'); return; }
+                if (!name) { alert('Введите ник игрока'); return; }
                 data = {
                     user_id: currentUserId,
                     type: 'player',
                     name: name,
-                    game: game,
-                    role: role,
-                    rank: rank,
-                    description: desc
+                    game: document.getElementById('regGame').value,
+                    role: document.getElementById('regRole').value,
+                    rank: document.getElementById('regRank').value,
+                    description: document.getElementById('regDesc').value
                 };
             } else {
                 const name = document.getElementById('teamName').value;
-                const game = document.getElementById('teamGame').value;
-                const rank = document.getElementById('teamRank').value;
-                const members = parseInt(document.getElementById('teamMembers').value);
-                const desc = document.getElementById('regDesc').value;
                 if (!name) { alert('Введите название команды'); return; }
                 data = {
                     user_id: currentUserId,
                     type: 'team',
                     name: name,
-                    game: game,
-                    rank: rank,
-                    members: members,
-                    description: desc
+                    game: document.getElementById('teamGame').value,
+                    rank: document.getElementById('teamRank').value,
+                    members: parseInt(document.getElementById('teamMembers').value),
+                    description: document.getElementById('regDesc').value
                 };
             }
-
-            alert(`2. Отправляем данные: ${JSON.stringify(data)}`);
 
             try {
                 const response = await fetch('/api/register', {
@@ -760,11 +757,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                alert(`3. Статус ответа: ${response.status}`);
+
                 if (response.ok) {
-                    const result = await response.json();
                     alert('✅ Анкета создана!');
                     document.getElementById('regForm').reset();
+                    // После сброса формы восстанавливаем required в соответствии с текущим типом
+                    if (currentType === 'player') {
+                        document.getElementById('regName').required = true;
+                        document.getElementById('teamName').required = false;
+                    } else {
+                        document.getElementById('regName').required = false;
+                        document.getElementById('teamName').required = true;
+                    }
                     loadMyProfiles();
                     switchTab(null, 'my-profiles');
                 } else {
@@ -835,6 +839,13 @@
         document.addEventListener('DOMContentLoaded', () => {
             initUserId();
             initializeFormFields();
+            // Устанавливаем начальный тип "player" и корректные required
+            const defaultTabBtn = document.querySelector('.type-btn.active');
+            if (defaultTabBtn) {
+                selectType({ target: defaultTabBtn }, 'player');
+            } else {
+                selectType({ target: document.querySelector('.type-btn') }, 'player');
+            }
             loadSearch();
         });
 
