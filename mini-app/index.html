@@ -540,21 +540,32 @@
 
         // ===== ИНИЦИАЛИЗАЦИЯ ID =====
         function initUserId() {
+            // Сначала пытаемся взять из URL параметра
+            const urlParams = new URLSearchParams(window.location.search);
+            let userId = urlParams.get('user_id');
+            
+            if (userId) {
+                currentUserId = parseInt(userId);
+                alert(`✅ ID из URL: ${currentUserId}`);
+                return;
+            }
+            
+            // Если нет — пробуем через Telegram.WebApp
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 tg.ready();
-                currentUserId = tg.initDataUnsafe?.user?.id;
-                if (currentUserId) {
-                    alert('✅ ID пользователя:', currentUserId);
-                } else {
-                    console.warn('⚠️ ID не получен, используем тестовый 123');
-                    alert("⚠️ ID не получен, используем тестовый 123");
-                    currentUserId = 123;
+                tg.expand();
+                userId = tg.initDataUnsafe?.user?.id;
+                if (userId) {
+                    currentUserId = userId;
+                    alert(`✅ ID из Telegram: ${currentUserId}`);
+                    return;
                 }
-            } else {
-                console.warn('⚠️ Не в Telegram, тестовый ID 123');
-                currentUserId = 123;
             }
+            
+            // Заглушка для тестов (но лучше выдать ошибку)
+            alert('❌ Не удалось определить ID пользователя. Запустите приложение через бота.');
+            currentUserId = null;
         }
 
         // ===== ЗАПОЛНЕНИЕ ВЫПАДАЮЩИХ СПИСКОВ =====

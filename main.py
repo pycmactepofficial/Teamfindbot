@@ -29,9 +29,12 @@ async def cmd_start(message: types.Message):
         "👋 Добро пожаловать в **Team Find**!\n\n"
         "Нажми «Открыть Team Find🎮», чтобы создать профиль или найти команду."
     )
+
+    webapp_url_with_user = f"{WEB_APP_URL}?user_id={user_id}"
+
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="Открыть Team Find🎮", web_app=WebAppInfo(url=WEB_APP_URL))]
+            [InlineKeyboardButton(text="Открыть Team Find🎮", web_app=WebAppInfo(url=webapp_url_with_user))]
         ]
     )
     await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
