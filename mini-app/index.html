@@ -868,44 +868,7 @@
             loadSearch();
         });
     </script>
-    <script>
-    (function() {
-        // Принудительно заставляем поля работать
-        const allInputs = document.querySelectorAll('input, textarea, select');
-        allInputs.forEach(el => {
-            el.addEventListener('touchstart', (e) => {
-                // Без этого на iOS иногда не срабатывает
-                e.stopPropagation();
-                el.focus();
-            });
-            el.addEventListener('click', (e) => {
-                el.focus();
-            });
-        });
-        
-        // На случай, если поле перекрыто клавиатурой - скроллим
-        const originalFocus = HTMLElement.prototype.focus;
-        HTMLElement.prototype.focus = function() {
-            originalFocus.apply(this, arguments);
-            setTimeout(() => {
-                this.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
-        };
-    })();
-    </script>
-    <script>
-        // Это решит проблему с клавиатурой
-        function onInputFocus(event) {
-            const element = event.target;
-            setTimeout(() => {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
-        }
-
-        document.querySelectorAll('input, select, textarea').forEach(input => {
-            input.addEventListener('focus', onInputFocus);
-        });
-    </script>
+    
 </body>
 
 </html>
