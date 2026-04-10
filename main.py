@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -16,12 +17,14 @@ logging.basicConfig(level=logging.INFO)
 
 # ---------- Telegram Bot ----------
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
-WEB_APP_URL = os.getenv("WEB_APP_URL", "web-production-be2c5.up.railway.app")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.app")
+PROXY_URL = 'socks5://193.233.254.63:1080'
 
 dp = Dispatcher()
 
 async def create_bot_and_dispatcher():
-    bot = Bot(token=BOT_TOKEN)
+    session = AiohttpSession(proxy=PROXY_URL)
+    bot = Bot(token=BOT_TOKEN, session=session)
     return bot
 
 @dp.message(Command("start"))
@@ -81,7 +84,14 @@ async def handle_webapp_data(message: types.Message):
     await message.answer("✅ Анкета создана! Загляни в 'Мои анкеты'.")
 
 # ---------- FastAPI WebApp ----------
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    await usersservice.user_service.init_db()
+    yield
+    # Shutdown (опционально закрываем соединения, если нужно)
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -89,11 +99,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup_event():
-    # Инициализируем базу данных при старте
-    await usersservice.user_service.init_db()
 
 @app.get("/")
 async def read_root():
