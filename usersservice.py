@@ -1,233 +1,254 @@
-import json
-import os
-from typing import List, Dict, Optional
+import asyncio
+import aiosqlite
 from datetime import datetime
+from typing import List, Dict, Optional
+import os
+
+DB_PATH = os.getenv("DB_PATH", "users.db")
 
 class UserService:
-    def __init__(self, json_file: str = "users.json"):
-        self.json_file = json_file
-        self.init_json()
+    def __init__(self, db_path: str = DB_PATH):
+        self.db_path = db_path
 
-    def init_json(self):
-        if not os.path.exists(self.json_file):
-            with open(self.json_file, 'w', encoding='utf-8') as f:
-                json.dump({"users": []}, f, ensure_ascii=False, indent=2)
+    async def _get_connection(self):
+        """Возвращает соединение с БД."""
+        conn = await aiosqlite.connect(self.db_path)
+        await conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
-    def _load_data(self) -> Dict:
-        try:
-            with open(self.json_file, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {"users": []}
+    async def init_db(self):
+        """Создаёт таблицы, если их нет."""
+        async with self._get_connection() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    chat_id INTEGER PRIMARY KEY,
+                    user_id INTEGER UNIQUE NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS profiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    type TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    game TEXT NOT NULL,
+                    role TEXT,
+                    rank TEXT NOT NULL,
+                    description TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+                )
+            """)
+            await conn.commit()
 
-    def _save_data(self, data: Dict):
-        with open(self.json_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
-    def get_user_by_chat_id(self, chat_id: int) -> Optional[Dict]:
-        data = self._load_data()
-        for user in data["users"]:
-            if user["chat_id"] == chat_id:
-                return user
+    # ---------- Вспомогательные методы ----------
+    async def _get_user_by_chat_id(self, chat_id: int) -> Optional[Dict]:
+        async with self._get_connection() as conn:
+            async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
         return None
 
-    def get_user_by_user_id(self, user_id: int) -> Optional[Dict]:
-        data = self._load_data()
-        for user in data["users"]:
-            if user.get("user_id") == user_id:
-                return user
+    async def _get_user_by_user_id(self, user_id: int) -> Optional[Dict]:
+        async with self._get_connection() as conn:
+            async with conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
         return None
 
-    def add_or_update_user(self, chat_id: int, user_id: int = None) -> Dict:
-        data = self._load_data()
-        user = self.get_user_by_chat_id(chat_id)
+    async def add_or_update_user(self, chat_id: int, user_id: int = None) -> Dict:
+        """Добавляет или обновляет пользователя."""
         if user_id is None:
             user_id = chat_id
-        if user is None:
-            user = {
-                "chat_id": chat_id,
-                "user_id": user_id,
-                "profiles": [],
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            data["users"].append(user)
+        now = datetime.now().isoformat()
+        user = await self._get_user_by_chat_id(chat_id)
+        if not user:
+            async with self._get_connection() as conn:
+                await conn.execute(
+                    "INSERT INTO users (chat_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                    (chat_id, user_id, now, now)
+                )
+                await conn.commit()
+            return {"chat_id": chat_id, "user_id": user_id, "created_at": now, "updated_at": now}
         else:
+            async with self._get_connection() as conn:
+                await conn.execute(
+                    "UPDATE users SET user_id = ?, updated_at = ? WHERE chat_id = ?",
+                    (user_id, now, chat_id)
+                )
+                await conn.commit()
             user["user_id"] = user_id
-            user["updated_at"] = datetime.now().isoformat()
-        self._save_data(data)
-        return user
+            user["updated_at"] = now
+            return user
 
-    def add_user(self, user_id: int, name: str, game: str, role: str, rank: str, description: str) -> Dict:
-        data = self._load_data()
-        user = self.get_user_by_user_id(user_id)
-        if user is None:
-            user = {
-                "chat_id": user_id,
-                "user_id": user_id,
-                "profiles": [],
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            data["users"].append(user)
+    async def add_user(self, user_id: int, name: str, game: str, role: str, rank: str, description: str) -> Dict:
+        """Добавляет профиль игрока. Если профиль с таким именем уже есть – обновляет."""
+        # Убедимся, что пользователь существует
+        user = await self._get_user_by_user_id(user_id)
+        if not user:
+            await self.add_or_update_user(user_id, user_id)
 
-        # Поиск существующего профиля игрока с таким же именем
-        existing = None
-        for p in user["profiles"]:
-            if p.get("type") == "player" and p.get("name") == name:
-                existing = p
-                break
+        now = datetime.now().isoformat()
+        async with self._get_connection() as conn:
+            # Проверяем существование профиля игрока с таким же именем
+            async with conn.execute(
+                "SELECT id FROM profiles WHERE user_id = ? AND type = 'player' AND name = ?",
+                (user_id, name)
+            ) as cursor:
+                existing = await cursor.fetchone()
 
-        if existing:
-            existing.update({
-                "game": game,
-                "role": role,
-                "rank": rank,
-                "description": description,
-                "updated_at": datetime.now().isoformat()
-            })
-            result = {"status": "updated", "id": existing["id"]}
-        else:
-            max_id = max([p.get("id", 0) for p in user["profiles"]], default=0)
-            new_id = max_id + 1
-            profile = {
-                "id": new_id,
-                "type": "player",
-                "name": name,
-                "game": game,
-                "role": role,
-                "rank": rank,
-                "description": description,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            user["profiles"].append(profile)
-            result = {"status": "success", "id": new_id}
+            if existing:
+                profile_id = existing[0]
+                await conn.execute(
+                    """UPDATE profiles
+                       SET game = ?, role = ?, rank = ?, description = ?, updated_at = ?
+                       WHERE id = ?""",
+                    (game, role, rank, description, now, profile_id)
+                )
+                await conn.commit()
+                return {"status": "updated", "id": profile_id}
+            else:
+                # Вставляем новый профиль
+                cursor = await conn.execute(
+                    """INSERT INTO profiles
+                       (user_id, type, name, game, role, rank, description, created_at, updated_at)
+                       VALUES (?, 'player', ?, ?, ?, ?, ?, ?, ?)""",
+                    (user_id, name, game, role, rank, description, now, now)
+                )
+                await conn.commit()
+                new_id = cursor.lastrowid
+                return {"status": "success", "id": new_id}
 
-        user["updated_at"] = datetime.now().isoformat()
-        self._save_data(data)
-        return result
-
-    def add_team(self, user_id: int, name: str, game: str, rank: str, members: int, description: str) -> Dict:
-        data = self._load_data()
-        user = self.get_user_by_user_id(user_id)
-        if user is None:
-            user = {
-                "chat_id": user_id,
-                "user_id": user_id,
-                "profiles": [],
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            data["users"].append(user)
-
-        # Поиск существующей команды с таким же названием
-        existing = None
-        for p in user["profiles"]:
-            if p.get("type") == "team" and p.get("name") == name:
-                existing = p
-                break
+    async def add_team(self, user_id: int, name: str, game: str, rank: str, members: int, description: str) -> Dict:
+        """Добавляет профиль команды. Если команда с таким названием уже есть – обновляет."""
+        user = await self._get_user_by_user_id(user_id)
+        if not user:
+            await self.add_or_update_user(user_id, user_id)
 
         full_desc = f"Состав: {members}/5\n{description}" if description else f"Состав: {members}/5"
+        now = datetime.now().isoformat()
 
-        if existing:
-            existing.update({
-                "game": game,
-                "rank": rank,
-                "description": full_desc,
-                "updated_at": datetime.now().isoformat()
-            })
-            result = {"status": "updated", "id": existing["id"]}
-        else:
-            max_id = max([p.get("id", 0) for p in user["profiles"]], default=0)
-            new_id = max_id + 1
-            profile = {
-                "id": new_id,
-                "type": "team",
-                "name": name,
-                "game": game,
-                "rank": rank,
-                "description": full_desc,
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            user["profiles"].append(profile)
-            result = {"status": "success", "id": new_id}
+        async with self._get_connection() as conn:
+            async with conn.execute(
+                "SELECT id FROM profiles WHERE user_id = ? AND type = 'team' AND name = ?",
+                (user_id, name)
+            ) as cursor:
+                existing = await cursor.fetchone()
 
-        user["updated_at"] = datetime.now().isoformat()
-        self._save_data(data)
-        return result
+            if existing:
+                profile_id = existing[0]
+                await conn.execute(
+                    """UPDATE profiles
+                       SET game = ?, rank = ?, description = ?, updated_at = ?
+                       WHERE id = ?""",
+                    (game, rank, full_desc, now, profile_id)
+                )
+                await conn.commit()
+                return {"status": "updated", "id": profile_id}
+            else:
+                cursor = await conn.execute(
+                    """INSERT INTO profiles
+                       (user_id, type, name, game, rank, description, created_at, updated_at)
+                       VALUES (?, 'team', ?, ?, ?, ?, ?, ?)""",
+                    (user_id, name, game, rank, full_desc, now, now)
+                )
+                await conn.commit()
+                return {"status": "success", "id": cursor.lastrowid}
 
-    def delete_profile(self, user_id: int, profile_id: int) -> bool:
-        data = self._load_data()
-        user = self.get_user_by_user_id(user_id)
-        if not user:
+    async def delete_profile(self, user_id: int, profile_id: int) -> bool:
+        """Удаляет профиль по ID, проверяя принадлежность пользователю."""
+        async with self._get_connection() as conn:
+            cursor = await conn.execute(
+                "DELETE FROM profiles WHERE id = ? AND user_id = ?",
+                (profile_id, user_id)
+            )
+            await conn.commit()
+            return cursor.rowcount > 0
+
+    async def update_profile(self, user_id: int, profile_id: int, **kwargs) -> bool:
+        """Обновляет поля профиля (name, game, role, rank, description)."""
+        allowed = {'name', 'game', 'role', 'rank', 'description'}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
             return False
-        for i, p in enumerate(user["profiles"]):
-            if p["id"] == profile_id:
-                user["profiles"].pop(i)
-                user["updated_at"] = datetime.now().isoformat()
-                self._save_data(data)
-                return True
-        return False
+        set_clause = ", ".join(f"{key} = ?" for key in updates)
+        values = list(updates.values()) + [datetime.now().isoformat(), profile_id, user_id]
 
-    def update_profile(self, user_id: int, profile_id: int, **kwargs) -> bool:
-        data = self._load_data()
-        user = self.get_user_by_user_id(user_id)
-        if not user:
-            return False
-        for p in user["profiles"]:
-            if p["id"] == profile_id:
-                allowed = {'name', 'game', 'role', 'rank', 'description'}
-                updates = {k: v for k, v in kwargs.items() if k in allowed}
-                if updates:
-                    p.update(updates)
-                    p["updated_at"] = datetime.now().isoformat()
-                    user["updated_at"] = datetime.now().isoformat()
-                    self._save_data(data)
-                    return True
-        return False
+        async with self._get_connection() as conn:
+            cursor = await conn.execute(
+                f"UPDATE profiles SET {set_clause}, updated_at = ? WHERE id = ? AND user_id = ?",
+                values
+            )
+            await conn.commit()
+            return cursor.rowcount > 0
 
-    def get_user_profiles(self, user_id: int) -> List[Dict]:
-        user = self.get_user_by_user_id(user_id)
-        if not user:
-            return []
-        return user["profiles"]
+    async def get_user_profiles(self, user_id: int) -> List[Dict]:
+        """Возвращает все профили пользователя."""
+        async with self._get_connection() as conn:
+            async with conn.execute(
+                "SELECT * FROM profiles WHERE user_id = ? ORDER BY updated_at DESC",
+                (user_id,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
-    def get_profile_by_id(self, user_id: int, profile_id: int) -> Optional[Dict]:
-        user = self.get_user_by_user_id(user_id)
-        if not user:
-            return None
-        for p in user["profiles"]:
-            if p["id"] == profile_id:
-                return p
-        return None
+    async def get_all_data(self) -> List[Dict]:
+        """Возвращает все профили всех пользователей (для поиска)."""
+        async with self._get_connection() as conn:
+            async with conn.execute("""
+                SELECT profiles.*, users.user_id AS owner_user_id
+                FROM profiles
+                JOIN users ON profiles.user_id = users.user_id
+            """) as cursor:
+                rows = await cursor.fetchall()
+                result = []
+                for row in rows:
+                    d = dict(row)
+                    d["user_id"] = d["owner_user_id"]  # единообразие с предыдущей версией
+                    result.append(d)
+                return result
 
-    def get_all_data(self) -> List[Dict]:
-        data = self._load_data()
-        result = []
-        for user in data["users"]:
-            for profile in user["profiles"]:
-                profile_copy = profile.copy()
-                profile_copy["user_id"] = user["user_id"]
-                result.append(profile_copy)
-        return result
+    async def search(self, game: Optional[str] = None, type_filter: Optional[str] = None, search_text: Optional[str] = None) -> List[Dict]:
+        """Поиск профилей по игре, типу и тексту."""
+        query = """
+            SELECT profiles.*, users.user_id AS owner_user_id
+            FROM profiles
+            JOIN users ON profiles.user_id = users.user_id
+            WHERE 1=1
+        """
+        params = []
+        if game and game != 'all':
+            query += " AND profiles.game = ?"
+            params.append(game)
+        if type_filter and type_filter != 'all':
+            query += " AND profiles.type = ?"
+            params.append(type_filter)
+        if search_text:
+            query += """ AND (
+                profiles.name LIKE ? OR
+                profiles.role LIKE ? OR
+                profiles.rank LIKE ? OR
+                profiles.description LIKE ?
+            )"""
+            like = f"%{search_text}%"
+            params.extend([like, like, like, like])
 
-    def search(self, game: Optional[str] = None, type_filter: Optional[str] = None, search_text: Optional[str] = None) -> List[Dict]:
-        all_data = self.get_all_data()
-        result = []
-        for item in all_data:
-            if game and game != 'all' and item.get('game') != game:
-                continue
-            if type_filter and type_filter != 'all' and item.get('type') != type_filter:
-                continue
-            if search_text:
-                search_lower = search_text.lower()
-                fields = [item.get('name',''), item.get('role',''), item.get('rank',''), item.get('description','')]
-                if not any(search_lower in f.lower() for f in fields if f):
-                    continue
-            result.append(item)
-        result.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
-        return result
+        query += " ORDER BY profiles.updated_at DESC"
 
+        async with self._get_connection() as conn:
+            async with conn.execute(query, params) as cursor:
+                rows = await cursor.fetchall()
+                result = []
+                for row in rows:
+                    d = dict(row)
+                    d["user_id"] = d["owner_user_id"]
+                    result.append(d)
+                return result
+
+# Глобальный экземпляр
 user_service = UserService()

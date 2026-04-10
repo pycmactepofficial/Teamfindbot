@@ -4,26 +4,31 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.client.session.aiohttp import AiohttpSession
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import usersservice
+import json
 
 logging.basicConfig(level=logging.INFO)
 
 # ---------- Telegram Bot ----------
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
-WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.app")
+WEB_APP_URL = os.getenv("WEB_APP_URL", "web-production-be2c5.up.railway.app")
 
-bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
+async def create_bot_and_dispatcher():
+    bot = Bot(token=BOT_TOKEN)
+    return bot
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
-    usersservice.user_service.add_or_update_user(chat_id, user_id)
+    await usersservice.user_service.add_or_update_user(chat_id, user_id)
 
     text = (
         "👋 Добро пожаловать в **Team Find**!\n\n"
@@ -51,6 +56,30 @@ async def cmd_register_team(message: types.Message):
 async def any_message(message: types.Message):
     await message.answer("Используй /start для начала работы.")
 
+@dp.message(lambda msg: msg.web_app_data is not None)
+async def handle_webapp_data(message: types.Message):
+    data = json.loads(message.web_app_data.data)
+    user_id = message.from_user.id
+    if data['type'] == 'player':
+        result = await usersservice.user_service.add_user(
+            user_id=user_id,
+            name=data['name'],
+            game=data['game'],
+            role=data['role'],
+            rank=data['rank'],
+            description=data['description']
+        )
+    else:
+        result = await usersservice.user_service.add_team(
+            user_id=user_id,
+            name=data['name'],
+            game=data['game'],
+            rank=data['rank'],
+            members=data['members'],
+            description=data['description']
+        )
+    await message.answer("✅ Анкета создана! Загляни в 'Мои анкеты'.")
+
 # ---------- FastAPI WebApp ----------
 app = FastAPI()
 app.add_middleware(
@@ -61,6 +90,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    # Инициализируем базу данных при старте
+    await usersservice.user_service.init_db()
+
 @app.get("/")
 async def read_root():
     return FileResponse(os.path.join("mini-app", "index.html"))
@@ -68,7 +102,7 @@ async def read_root():
 @app.get("/api/data")
 async def get_data(game: str = "all", type_filter: str = "all", search: str = ""):
     try:
-        data = usersservice.user_service.search(game=game, type_filter=type_filter, search_text=search)
+        data = await usersservice.user_service.search(game=game, type_filter=type_filter, search_text=search)
         return JSONResponse(content=data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -76,7 +110,7 @@ async def get_data(game: str = "all", type_filter: str = "all", search: str = ""
 @app.get("/api/user-profiles/{user_id}")
 async def get_user_profiles(user_id: int):
     try:
-        profiles = usersservice.user_service.get_user_profiles(user_id)
+        profiles = await usersservice.user_service.get_user_profiles(user_id)
         return JSONResponse(content=profiles)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -88,7 +122,7 @@ async def register(data: dict):
         if user_id == 0:
             raise ValueError("user_id required")
         if data['type'] == 'player':
-            result = usersservice.user_service.add_user(
+            result = await usersservice.user_service.add_user(
                 user_id=user_id,
                 name=data['name'],
                 game=data['game'],
@@ -97,7 +131,7 @@ async def register(data: dict):
                 description=data['description']
             )
         else:
-            result = usersservice.user_service.add_team(
+            result = await usersservice.user_service.add_team(
                 user_id=user_id,
                 name=data['name'],
                 game=data['game'],
@@ -112,7 +146,7 @@ async def register(data: dict):
 @app.delete("/api/profile/{profile_id}")
 async def delete_profile(profile_id: int, user_id: int):
     try:
-        success = usersservice.user_service.delete_profile(user_id, profile_id)
+        success = await usersservice.user_service.delete_profile(user_id, profile_id)
         if success:
             return {"status": "success"}
         else:
@@ -127,7 +161,7 @@ async def update_profile(profile_id: int, data: dict):
         if user_id == 0:
             raise ValueError("user_id required")
         update_data = {k: v for k, v in data.items() if k != 'user_id'}
-        success = usersservice.user_service.update_profile(user_id, profile_id, **update_data)
+        success = await usersservice.user_service.update_profile(user_id, profile_id, **update_data)
         if success:
             return {"status": "success"}
         else:
@@ -137,6 +171,7 @@ async def update_profile(profile_id: int, data: dict):
 
 # ---------- Запуск обоих сервисов ----------
 async def run_bot():
+    bot = await create_bot_and_dispatcher()
     await dp.start_polling(bot, skip_updates=True)
 
 async def run_web():
