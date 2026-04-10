@@ -2,6 +2,7 @@ import aiosqlite
 from datetime import datetime
 from typing import List, Dict, Optional
 import os
+from contextlib import asynccontextmanager
 
 DB_PATH = os.getenv("DB_PATH", "users.db")
 
@@ -9,15 +10,19 @@ class UserService:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
 
+    @asynccontextmanager
     async def _get_connection(self):
-        """Возвращает соединение с БД."""
+        """Асинхронный контекстный менеджер соединения с БД."""
         conn = await aiosqlite.connect(self.db_path)
         await conn.execute("PRAGMA foreign_keys = ON")
-        return conn
+        try:
+            yield conn
+        finally:
+            await conn.close()
 
     async def init_db(self):
         """Создаёт таблицы, если их нет."""
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     chat_id INTEGER PRIMARY KEY,
@@ -44,20 +49,16 @@ class UserService:
             await conn.commit()
 
     async def _get_user_by_chat_id(self, chat_id: int) -> Optional[Dict]:
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
                 row = await cursor.fetchone()
-                if row:
-                    return dict(row)
-        return None
+                return dict(row) if row else None
 
     async def _get_user_by_user_id(self, user_id: int) -> Optional[Dict]:
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 row = await cursor.fetchone()
-                if row:
-                    return dict(row)
-        return None
+                return dict(row) if row else None
 
     async def add_or_update_user(self, chat_id: int, user_id: int = None) -> Dict:
         if user_id is None:
@@ -65,7 +66,7 @@ class UserService:
         now = datetime.now().isoformat()
         user = await self._get_user_by_chat_id(chat_id)
         if not user:
-            async with await self._get_connection() as conn:
+            async with self._get_connection() as conn:
                 await conn.execute(
                     "INSERT INTO users (chat_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
                     (chat_id, user_id, now, now)
@@ -73,7 +74,7 @@ class UserService:
                 await conn.commit()
             return {"chat_id": chat_id, "user_id": user_id, "created_at": now, "updated_at": now}
         else:
-            async with await self._get_connection() as conn:
+            async with self._get_connection() as conn:
                 await conn.execute(
                     "UPDATE users SET user_id = ?, updated_at = ? WHERE chat_id = ?",
                     (user_id, now, chat_id)
@@ -89,7 +90,7 @@ class UserService:
             await self.add_or_update_user(user_id, user_id)
 
         now = datetime.now().isoformat()
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute(
                 "SELECT id FROM profiles WHERE user_id = ? AND type = 'player' AND name = ?",
                 (user_id, name)
@@ -114,8 +115,7 @@ class UserService:
                     (user_id, name, game, role, rank, description, now, now)
                 )
                 await conn.commit()
-                new_id = cursor.lastrowid
-                return {"status": "success", "id": new_id}
+                return {"status": "success", "id": cursor.lastrowid}
 
     async def add_team(self, user_id: int, name: str, game: str, rank: str, members: int, description: str) -> Dict:
         user = await self._get_user_by_user_id(user_id)
@@ -125,7 +125,7 @@ class UserService:
         full_desc = f"Состав: {members}/5\n{description}" if description else f"Состав: {members}/5"
         now = datetime.now().isoformat()
 
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute(
                 "SELECT id FROM profiles WHERE user_id = ? AND type = 'team' AND name = ?",
                 (user_id, name)
@@ -153,7 +153,7 @@ class UserService:
                 return {"status": "success", "id": cursor.lastrowid}
 
     async def delete_profile(self, user_id: int, profile_id: int) -> bool:
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             cursor = await conn.execute(
                 "DELETE FROM profiles WHERE id = ? AND user_id = ?",
                 (profile_id, user_id)
@@ -169,7 +169,7 @@ class UserService:
         set_clause = ", ".join(f"{key} = ?" for key in updates)
         values = list(updates.values()) + [datetime.now().isoformat(), profile_id, user_id]
 
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             cursor = await conn.execute(
                 f"UPDATE profiles SET {set_clause}, updated_at = ? WHERE id = ? AND user_id = ?",
                 values
@@ -178,7 +178,7 @@ class UserService:
             return cursor.rowcount > 0
 
     async def get_user_profiles(self, user_id: int) -> List[Dict]:
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute(
                 "SELECT * FROM profiles WHERE user_id = ? ORDER BY updated_at DESC",
                 (user_id,)
@@ -187,7 +187,7 @@ class UserService:
                 return [dict(row) for row in rows]
 
     async def get_all_data(self) -> List[Dict]:
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute("""
                 SELECT profiles.*, users.user_id AS owner_user_id
                 FROM profiles
@@ -227,7 +227,7 @@ class UserService:
 
         query += " ORDER BY profiles.updated_at DESC"
 
-        async with await self._get_connection() as conn:
+        async with self._get_connection() as conn:
             async with conn.execute(query, params) as cursor:
                 rows = await cursor.fetchall()
                 result = []
