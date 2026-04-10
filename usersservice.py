@@ -64,25 +64,29 @@ class UserService:
         if user_id is None:
             user_id = chat_id
         now = datetime.now().isoformat()
-        user = await self._get_user_by_chat_id(chat_id)
-        if not user:
-            async with self._get_connection() as conn:
-                await conn.execute(
-                    "INSERT INTO users (chat_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                    (chat_id, user_id, now, now)
-                )
-                await conn.commit()
-            return {"chat_id": chat_id, "user_id": user_id, "created_at": now, "updated_at": now}
-        else:
-            async with self._get_connection() as conn:
-                await conn.execute(
-                    "UPDATE users SET user_id = ?, updated_at = ? WHERE chat_id = ?",
-                    (user_id, now, chat_id)
-                )
-                await conn.commit()
-            user["user_id"] = user_id
-            user["updated_at"] = now
-            return user
+
+        async with self._get_connection() as conn:
+            # Атомарная вставка или обновление
+            await conn.execute(
+                """
+                INSERT INTO users (chat_id, user_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(chat_id) DO UPDATE SET
+                    user_id = excluded.user_id,
+                    updated_at = excluded.updated_at
+                """,
+                (chat_id, user_id, now, now)
+            )
+            await conn.commit()
+
+            # Получаем актуальные данные (включая created_at)
+            async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return dict(row)
+                else:
+                    # Этого не должно произойти, но на всякий случай
+                    raise RuntimeError("Failed to fetch user after upsert")
 
     async def add_user(self, user_id: int, name: str, game: str, role: str, rank: str, description: str) -> Dict:
         user = await self._get_user_by_user_id(user_id)
