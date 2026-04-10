@@ -14,6 +14,7 @@ class UserService:
     async def _get_connection(self):
         """Асинхронный контекстный менеджер соединения с БД."""
         conn = await aiosqlite.connect(self.db_path)
+        conn.row_factory = aiosqlite.Row   # <-- СТРОКА ДОБАВЛЕНА
         await conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
@@ -66,7 +67,6 @@ class UserService:
         now = datetime.now().isoformat()
 
         async with self._get_connection() as conn:
-            # Атомарная вставка или обновление
             await conn.execute(
                 """
                 INSERT INTO users (chat_id, user_id, created_at, updated_at)
@@ -79,14 +79,9 @@ class UserService:
             )
             await conn.commit()
 
-            # Получаем актуальные данные (включая created_at)
             async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
                 row = await cursor.fetchone()
-                if row:
-                    return dict(row)
-                else:
-                    # Этого не должно произойти, но на всякий случай
-                    raise RuntimeError("Failed to fetch user after upsert")
+                return dict(row)   # теперь row — aiosqlite.Row, преобразование работает
 
     async def add_user(self, user_id: int, name: str, game: str, role: str, rank: str, description: str) -> Dict:
         user = await self._get_user_by_user_id(user_id)
