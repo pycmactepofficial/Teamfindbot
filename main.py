@@ -23,8 +23,7 @@ PROXY_URL = 'socks5://193.233.254.63:1080'
 dp = Dispatcher()
 
 async def create_bot_and_dispatcher():
-    session = AiohttpSession(proxy=PROXY_URL)
-    bot = Bot(token=BOT_TOKEN, session=session)
+    bot = Bot(token=BOT_TOKEN)
     return bot
 
 @dp.message(Command("start"))
