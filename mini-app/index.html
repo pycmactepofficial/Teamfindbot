@@ -822,10 +822,6 @@
                 return;
             }
 
-            if (Number(ownerUserId) === Number(currentUserId)) {
-                alert('Это ваша собственная анкета');
-                return;
-            }
 
             if (typeof Telegram.WebApp.openChat === 'function') {
                 // Пробуем открыть диалог
