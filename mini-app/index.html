@@ -739,7 +739,7 @@
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
             } else {
-                actions = `<button class="btn btn-primary" onclick="alert('Функция чата в разработке')">💬 Написать</button>`;
+                actions = `<button class="btn btn-primary" onclick="openChat(${item.user_id})">💬 Написать</button>`;
             }
             return `
                 <div class="card">
@@ -804,6 +804,15 @@
                 }
             } catch (err) {
                 alert('Ошибка: ' + err.message);
+            }
+        }
+
+        function openChat(ownerUserId) {
+            if (window.Telegram && Telegram.WebApp) {
+                // Открываем диалог с пользователем по его user_id
+                Telegram.WebApp.openTelegramLink(`tg://user?id=${ownerUserId}`);
+            } else {
+                alert('Функция доступна только в Telegram');
             }
         }
 
