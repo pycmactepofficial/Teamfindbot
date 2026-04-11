@@ -1012,7 +1012,7 @@
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, ${item.name}, ${item.description}, ${item.rank})">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${item.name}', '${item.description}', '${item.rank}')">✏️ Редактировать</button>
                     <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
