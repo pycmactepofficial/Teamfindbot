@@ -23,6 +23,12 @@ class InterestRequest(BaseModel):
     current_username: str = ""
     current_name: str = ""
 
+class VerificationReport(BaseModel):
+    user_id: int
+    timestamp: str
+    verdict: str
+    findings: dict
+
 # ---------- Telegram Bot ----------
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.app")
