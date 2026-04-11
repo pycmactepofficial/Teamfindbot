@@ -1011,7 +1011,7 @@
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(...)">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openEditModal(${item.id})">✏️ Редактировать</button>
                     <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
