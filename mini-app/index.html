@@ -543,12 +543,21 @@
             if (window.Telegram && window.Telegram.WebApp) {
                 const tg = window.Telegram.WebApp;
                 tg.ready();
-                currentUserId = tg.initDataUnsafe?.user?.id;
-                if (currentUserId) {
-                    console.log('✅ ID пользователя:', currentUserId);
+                const user = tg.initDataUnsafe?.user;
+                if (user && user.id) {
+                    currentUserId = user.id;
+                    console.log('✅ ID пользователя (Telegram):', currentUserId);
                 } else {
-                    console.warn('⚠️ ID не получен, используем тестовый 123');
-                    currentUserId = 123;
+                    // Пробуем взять из URL (передаётся ботом)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const urlUserId = urlParams.get('user_id');
+                    if (urlUserId) {
+                        currentUserId = parseInt(urlUserId);
+                        console.log('✅ ID пользователя (URL):', currentUserId);
+                    } else {
+                        console.warn('⚠️ ID не получен, используем тестовый 123');
+                        currentUserId = 123;
+                    }
                 }
             } else {
                 console.warn('⚠️ Не в Telegram, тестовый ID 123');
@@ -813,19 +822,18 @@
                 return;
             }
 
-            const url = `tg://user?id=${ownerUserId}`;
-            try {
-                if (typeof Telegram.WebApp.openTelegramLink === 'function') {
-                    Telegram.WebApp.openTelegramLink(url);
-                } else if (typeof Telegram.WebApp.openChat === 'function') {
-                    // Запасной вариант (старый метод)
-                    Telegram.WebApp.openChat({ user_id: ownerUserId });
-                } else {
-                    window.open(url);
-                }
-            } catch (e) {
-                console.error(e);
-                alert('Не удалось открыть чат. ID пользователя: ' + ownerUserId);
+            if (Number(ownerUserId) === Number(currentUserId)) {
+                alert('Это ваша собственная анкета');
+                return;
+            }
+
+            if (typeof Telegram.WebApp.openChat === 'function') {
+                // Пробуем открыть диалог
+                Telegram.WebApp.openChat({ user_id: Number(ownerUserId) });
+            } else {
+                // Запасной вариант – копируем ID в буфер
+                navigator.clipboard.writeText(ownerUserId);
+                alert(`Не удалось открыть чат автоматически.\nID пользователя скопирован. Напишите боту: /start и укажите этот ID.`);
             }
         }
 
