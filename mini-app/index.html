@@ -763,47 +763,57 @@
 
         // Загрузка данных профиля
         async function loadProfile() {
+            const nameEl = document.getElementById('profileName');
+            const idSpan = document.getElementById('profileUserIdSpan');
+            const profilesContainer = document.getElementById('profileProfilesList');
+            const statusBlock = document.getElementById('verificationStatusBlock');
+
+            // Заглушка на случай, если currentUserId ещё не пришёл
             if (!currentUserId) {
-                document.getElementById('profileName').textContent = 'Не авторизован';
-                document.getElementById('profileUserIdSpan').textContent = '—';
-                document.getElementById('profileProfilesList').innerHTML = '<div class="no-results">Войдите через Telegram</div>';
-                return;
+                nameEl.textContent = 'Загрузка...';
+                idSpan.textContent = '—';
+                profilesContainer.innerHTML = '<div class="no-results">Подождите, получаем ID...</div>';
+                statusBlock.innerHTML = '<span class="status-badge status-not_checked">Ожидание...</span>';
+                // Пробуем получить ID ещё раз
+                initUserId();
+                if (!currentUserId) return;
             }
 
-            // Имя пользователя из Telegram WebApp
+            // Пытаемся взять имя из Telegram
             let userName = 'Пользователь';
             if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
                 const user = Telegram.WebApp.initDataUnsafe.user;
-                userName = user.first_name + (user.last_name ? ' ' + user.last_name : '');
-                document.getElementById('profileName').textContent = userName;
+                userName = user.first_name || '';
+                if (user.last_name) userName += ' ' + user.last_name;
+                if (!userName.trim()) userName = `ID: ${currentUserId}`;
             } else {
-                document.getElementById('profileName').textContent = `ID: ${currentUserId}`;
+                userName = `ID: ${currentUserId}`;
             }
-            document.getElementById('profileUserIdSpan').textContent = currentUserId;
+            nameEl.textContent = userName;
+            idSpan.textContent = currentUserId;
 
-            // Загружаем анкеты пользователя
+            // Загружаем анкеты
             try {
                 const response = await fetch(`/api/user-profiles/${currentUserId}`);
+                if (!response.ok) throw new Error(`Ошибка ${response.status}`);
                 const profiles = await response.json();
-                const container = document.getElementById('profileProfilesList');
-                
+
                 if (!profiles || profiles.length === 0) {
-                    container.innerHTML = '<div class="no-results">У вас нет анкет. Создайте первую!</div>';
-                    document.getElementById('verificationStatusBlock').innerHTML = '<span class="status-badge status-not_checked">Нет анкет</span>';
+                    profilesContainer.innerHTML = '<div class="no-results">У вас нет анкет. Создайте первую!</div>';
+                    statusBlock.innerHTML = '<span class="status-badge status-not_checked">Нет анкет</span>';
                     return;
                 }
 
-                // Рендерим карточки (используем ту же createCard, но с isOwn = true)
-                container.innerHTML = profiles.map(p => createCard(p, true)).join('');
+                // Рендерим карточки (isOwn = true)
+                profilesContainer.innerHTML = profiles.map(p => createCard(p, true)).join('');
 
-                // Собираем сводку по верификации
+                // Сводка верификации
                 let hasClean = false, hasSuspicious = false;
                 profiles.forEach(p => {
                     if (p.cheat_verdict === 'clean') hasClean = true;
                     if (p.cheat_verdict === 'suspicious') hasSuspicious = true;
                 });
 
-                const statusBlock = document.getElementById('verificationStatusBlock');
                 if (hasSuspicious) {
                     statusBlock.innerHTML = '<span class="status-badge status-suspicious">⚠️ Обнаружены подозрения</span>';
                 } else if (hasClean) {
@@ -813,6 +823,8 @@
                 }
             } catch (err) {
                 console.error('Ошибка загрузки профиля:', err);
+                profilesContainer.innerHTML = '<div class="no-results">Ошибка загрузки анкет</div>';
+                statusBlock.innerHTML = '<span class="status-badge status-not_checked">Ошибка</span>';
             }
         }
 
@@ -836,20 +848,34 @@
             document.getElementById(tabName).classList.add('active');
             if (e) e.target.classList.add('active');
             else {
-                // Находим кнопку с соответствующим tabName и активируем
                 document.querySelectorAll('.tab').forEach(tab => {
-                    if (tab.textContent.includes(tabName === 'profile' ? 'Профиль' : 
+                    if (tab.textContent.includes(
+                        tabName === 'profile' ? 'Профиль' : 
                         tabName === 'search' ? 'Поиск' : 
-                        tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать')) {
+                        tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать'
+                    )) {
                         tab.classList.add('active');
                     }
                 });
             }
 
-            if (tabName === 'profile') loadProfile();
-            if (tabName === 'my-profiles') loadMyProfiles();
-            if (tabName === 'search') loadSearch();
+            // Убедимся, что ID есть перед загрузкой
+            if (!currentUserId) {
+                initUserId();
+                setTimeout(() => {
+                    if (currentUserId) loadTabContent(tabName);
+                }, 100);
+            } else {
+                loadTabContent(tabName);
+            }
         }
+
+        function loadTabContent(tabName) {
+            if (tabName === 'profile') loadProfile();
+            else if (tabName === 'my-profiles') loadMyProfiles();
+            else if (tabName === 'search') loadSearch();
+        }
+
 
         // ===== РЕГИСТРАЦИЯ (отправка на бэкенд) =====
         async function registerProfile(e) {
