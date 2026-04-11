@@ -808,16 +808,24 @@
         }
 
         function openChat(ownerUserId) {
-            if (window.Telegram && Telegram.WebApp) {
-                if (typeof Telegram.WebApp.openChat === 'function') {
-                    // Основной метод — открывает диалог с пользователем по ID
+            if (!window.Telegram || !Telegram.WebApp) {
+                alert('Функция доступна только в Telegram');
+                return;
+            }
+
+            const url = `tg://user?id=${ownerUserId}`;
+            try {
+                if (typeof Telegram.WebApp.openTelegramLink === 'function') {
+                    Telegram.WebApp.openTelegramLink(url);
+                } else if (typeof Telegram.WebApp.openChat === 'function') {
+                    // Запасной вариант (старый метод)
                     Telegram.WebApp.openChat({ user_id: ownerUserId });
                 } else {
-                    // Резерв — если очень старая версия Telegram
-                    alert('Обновите Telegram для работы чата');
+                    window.open(url);
                 }
-            } else {
-                alert('Функция доступна только в Telegram');
+            } catch (e) {
+                console.error(e);
+                alert('Не удалось открыть чат. ID пользователя: ' + ownerUserId);
             }
         }
 
