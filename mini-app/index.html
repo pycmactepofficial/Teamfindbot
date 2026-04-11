@@ -389,6 +389,36 @@
             border-color: #66fcf1;
             color: #0b0c10;
         }
+
+        .verification-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #0b0c10;
+            border: 1px solid;
+        }
+        .verdict-clean {
+            color: #2ecc71;
+            border-color: #2ecc71;
+        }
+        .verdict-suspicious {
+            color: #e74c3c;
+            border-color: #e74c3c;
+        }
+        .verdict-not_checked {
+            color: #95a5a6;
+            border-color: #95a5a6;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
     </style>
 </head>
 
@@ -738,9 +768,20 @@
             const typeLabel = isPlayer ? '👤 ИГРОК' : '👥 КОМАНДА';
             const icons = { 'CS2': '🎯', 'Valorant': '🔫', 'Dota 2': '⚔️', 'Fortnite': '🛸', 'LoL': '🏆' };
             const gameIcon = icons[item.game] || '🎮';
+            
+            // Статус верификации
+            const verdict = item.cheat_verdict || 'not_checked';
+            const verdictText = {
+                'clean': '✅ Чист',
+                'suspicious': '⚠️ Подозрение',
+                'not_checked': '❓ Не проверен'
+            }[verdict] || '❓ Не проверен';
+            const verdictClass = `verdict-${verdict}`;
+            
             let details = isPlayer ?
                 `<div><span>Роль:</span> ${item.role || 'N/A'}</div><div><span>Ранг:</span> ${item.rank}</div>` :
                 `<div><span>Ранг:</span> ${item.rank}</div>`;
+            
             let actions = '';
             if (isOwn) {
                 actions = `
@@ -750,10 +791,14 @@
             } else {
                 actions = `<button class="btn btn-primary" onclick="sendInterest(${item.id}, ${item.user_id})">💬 Написать</button>`;
             }
+            
             return `
                 <div class="card">
                     <div class="card-type">${typeLabel}</div>
-                    <div class="card-title">${item.name}</div>
+                    <div class="card-header">
+                        <div class="card-title">${item.name}</div>
+                        <span class="verification-badge ${verdictClass}">${verdictText}</span>
+                    </div>
                     <div class="card-game">${gameIcon} ${item.game}</div>
                     <div class="card-details">${details}<div style="margin-top:8px;"><span>Описание:</span> ${item.description || 'Нет описания'}</div></div>
                     <div class="card-actions">${actions}</div>

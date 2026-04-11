@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 import os
 from contextlib import asynccontextmanager
+import json  # <-- добавлен импорт
 
 DB_PATH = os.getenv("DB_PATH", "users.db")
 
@@ -14,7 +15,7 @@ class UserService:
     async def _get_connection(self):
         """Асинхронный контекстный менеджер соединения с БД."""
         conn = await aiosqlite.connect(self.db_path)
-        conn.row_factory = aiosqlite.Row   # <-- СТРОКА ДОБАВЛЕНА
+        conn.row_factory = aiosqlite.Row
         await conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
@@ -22,7 +23,7 @@ class UserService:
             await conn.close()
 
     async def init_db(self):
-        """Создаёт таблицы, если их нет."""
+        """Создаёт таблицы, если их нет. Добавляет новые колонки при необходимости."""
         async with self._get_connection() as conn:
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -44,11 +45,33 @@ class UserService:
                     description TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
+                    cheat_verdict TEXT DEFAULT 'not_checked',
+                    cheat_report TEXT,
+                    last_verification TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
                 )
             """)
+            # Миграция: добавляем колонки, если их ещё нет (для существующих БД)
+            await self._migrate_add_verification_columns(conn)
             await conn.commit()
 
+    async def _migrate_add_verification_columns(self, conn):
+        """Проверяет и добавляет новые колонки в существующую таблицу profiles."""
+        # Получаем список существующих колонок
+        cursor = await conn.execute("PRAGMA table_info(profiles)")
+        rows = await cursor.fetchall()
+        existing_columns = [row['name'] for row in rows]
+        
+        columns_to_add = {
+            'cheat_verdict': 'TEXT DEFAULT "not_checked"',
+            'cheat_report': 'TEXT',
+            'last_verification': 'TEXT'
+        }
+        for col_name, col_def in columns_to_add.items():
+            if col_name not in existing_columns:
+                await conn.execute(f"ALTER TABLE profiles ADD COLUMN {col_name} {col_def}")
+
+    # ---------- Существующие методы (оставлены без изменений) ----------
     async def _get_user_by_chat_id(self, chat_id: int) -> Optional[Dict]:
         async with self._get_connection() as conn:
             async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
@@ -81,8 +104,8 @@ class UserService:
 
             async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
                 row = await cursor.fetchone()
-                return dict(row)   # теперь row — aiosqlite.Row, преобразование работает
-            
+                return dict(row)
+
     async def get_profile_by_id(self, profile_id: int) -> Optional[Dict]:
         async with self._get_connection() as conn:
             async with conn.execute(
@@ -250,5 +273,42 @@ class UserService:
                     d["user_id"] = d["owner_user_id"]
                     result.append(d)
                 return result
+
+    # ---------- НОВЫЕ МЕТОДЫ ДЛЯ ВЕРИФИКАЦИИ ----------
+    async def save_verification_result(self, profile_id: int, report: dict) -> bool:
+        """
+        Сохраняет JSON-отчёт от античита и вычисляет вердикт.
+        report должен содержать ключ 'verdict' и опционально 'findings'.
+        """
+        verdict = report.get('verdict', 'unknown')
+        findings = report.get('findings', {})
+        findings_json = json.dumps(findings)
+        now = datetime.now().isoformat()
+
+        async with self._get_connection() as conn:
+            cursor = await conn.execute("""
+                UPDATE profiles
+                SET cheat_verdict = ?,
+                    cheat_report = ?,
+                    last_verification = ?
+                WHERE id = ?
+            """, (verdict, findings_json, now, profile_id))
+            await conn.commit()
+            return cursor.rowcount > 0
+
+    async def get_verification_status(self, profile_id: int) -> Optional[Dict]:
+        """Возвращает актуальный статус верификации для фронта."""
+        async with self._get_connection() as conn:
+            async with conn.execute(
+                "SELECT cheat_verdict, last_verification FROM profiles WHERE id = ?",
+                (profile_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return {
+                        "verdict": row['cheat_verdict'] or 'not_checked',
+                        "last_check": row['last_verification']
+                    }
+                return None
 
 user_service = UserService()

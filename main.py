@@ -181,6 +181,36 @@ async def update_profile(profile_id: int, data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+@app.post("/api/profile/{profile_id}/verification")
+async def receive_verification_report(profile_id: int, report: VerificationReport):
+    """
+    Принимает отчёт от клиента античита.
+    Клиент должен передать JSON с полями:
+    {
+        "user_id": 123,
+        "timestamp": "2026-04-11T15:30:00Z",
+        "verdict": "clean" или "suspicious",
+        "findings": { ... }
+    }
+    """
+    try:
+        # Проверяем, что профиль существует
+        profile = await usersservice.user_service.get_profile_by_id(profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        # Сохраняем результат в БД
+        success = await usersservice.user_service.save_verification_result(
+            profile_id, 
+            report.dict()
+        )
+        if success:
+            return {"status": "success", "message": "Verification report saved"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save report")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @app.post("/api/interest")
 async def send_interest(req: InterestRequest):
     try:
