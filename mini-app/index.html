@@ -748,7 +748,7 @@
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
             } else {
-                actions = `<button class="btn btn-primary" onclick="openChat(${item.user_id})">💬 Написать</button>`;
+                actions = `<button class="btn btn-primary" onclick="sendInterest(${item.id}, ${item.user_id})">💬 Написать</button>`;
             }
             return `
                 <div class="card">
@@ -816,20 +816,42 @@
             }
         }
 
-        function openChat(ownerUserId) {
-            if (!window.Telegram || !Telegram.WebApp) {
-                alert('Функция доступна только в Telegram');
+        async function sendInterest(profileId, ownerUserId) {
+            if (!currentUserId) {
+                alert('Ошибка: не удалось определить ваш ID');
                 return;
             }
 
+            let currentUsername = '';
+            let currentName = '';
+            if (window.Telegram && Telegram.WebApp) {
+                const user = Telegram.WebApp.initDataUnsafe?.user;
+                if (user) {
+                    currentUsername = user.username || '';
+                    currentName = user.first_name || '';
+                }
+            }
 
-            if (typeof Telegram.WebApp.openChat === 'function') {
-                // Пробуем открыть диалог
-                Telegram.WebApp.openChat({ user_id: Number(ownerUserId) });
-            } else {
-                // Запасной вариант – копируем ID в буфер
-                navigator.clipboard.writeText(ownerUserId);
-                alert(`Не удалось открыть чат автоматически.\nID пользователя скопирован. Напишите боту: /start и укажите этот ID.`);
+            try {
+                const response = await fetch('/api/interest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profile_id: profileId,
+                        owner_user_id: ownerUserId,
+                        current_user_id: currentUserId,
+                        current_username: currentUsername,
+                        current_name: currentName
+                    })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert('✅ Владельцу анкеты отправлено уведомление!');
+                } else {
+                    alert('❌ Ошибка: ' + (data.detail || 'Неизвестная ошибка'));
+                }
+            } catch (err) {
+                alert('❌ Ошибка соединения: ' + err.message);
             }
         }
 

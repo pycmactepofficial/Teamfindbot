@@ -9,11 +9,19 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
 import usersservice
 import json
 
 logging.basicConfig(level=logging.INFO)
+
+class InterestRequest(BaseModel):
+    profile_id: int
+    owner_user_id: int
+    current_user_id: int
+    current_username: str = ""
+    current_name: str = ""
 
 # ---------- Telegram Bot ----------
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
@@ -170,6 +178,43 @@ async def update_profile(profile_id: int, data: dict):
             return {"status": "success"}
         else:
             raise HTTPException(status_code=404, detail="Not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/api/interest")
+async def send_interest(req: InterestRequest):
+    try:
+        # Получаем данные анкеты
+        profile = await usersservice.user_service.get_profile_by_id(req.profile_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Анкета не найдена")
+
+        # Получаем chat_id владельца
+        owner_chat_id = await usersservice.user_service.get_chat_id_by_user_id(req.owner_user_id)
+        if not owner_chat_id:
+            raise HTTPException(status_code=404, detail="Владелец анкеты не найден в базе")
+
+        # Формируем текст и ссылку на откликнувшегося
+        if req.current_username:
+            mention = f"@{req.current_username}"
+            link = f"tg://resolve?domain={req.current_username}"
+        else:
+            mention = f"пользователь {req.current_user_id}"
+            link = f"tg://user?id={req.current_user_id}"
+
+        profile_type = profile['type']
+        profile_name = profile['name']
+
+        if profile_type == 'team':
+            text = f"🏆 В вашу команду **{profile_name}** хочет вступить {mention}\n\n👉 [Написать {mention}]({link})"
+        else:
+            text = f"👤 Пользователь {mention} заинтересован в вашей анкете игрока **{profile_name}**\n\n👉 [Написать {mention}]({link})"
+
+        # Отправляем сообщение через бота
+        bot = await create_bot_and_dispatcher()
+        await bot.send_message(owner_chat_id, text, parse_mode="Markdown", disable_web_page_preview=True)
+
+        return {"status": "success", "message": "Уведомление отправлено"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

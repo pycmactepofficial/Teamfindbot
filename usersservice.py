@@ -82,6 +82,21 @@ class UserService:
             async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
                 row = await cursor.fetchone()
                 return dict(row)   # теперь row — aiosqlite.Row, преобразование работает
+            
+    async def get_profile_by_id(self, profile_id: int) -> Optional[Dict]:
+        async with self._get_connection() as conn:
+            async with conn.execute(
+                "SELECT profiles.*, users.user_id AS owner_user_id, users.chat_id FROM profiles JOIN users ON profiles.user_id = users.user_id WHERE profiles.id = ?",
+                (profile_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                return dict(row) if row else None
+
+    async def get_chat_id_by_user_id(self, user_id: int) -> Optional[int]:
+        async with self._get_connection() as conn:
+            async with conn.execute("SELECT chat_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else None
 
     async def add_user(self, user_id: int, name: str, game: str, role: str, rank: str, description: str) -> Dict:
         user = await self._get_user_by_user_id(user_id)
