@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import usersservice
+from fastapi.staticfiles import StaticFiles
 import json
 
 logging.basicConfig(level=logging.INFO)
@@ -116,6 +117,8 @@ app.add_middleware(
 @app.get("/")
 async def read_root():
     return FileResponse(os.path.join("mini-app", "index.html"))
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/api/data")
 async def get_data(game: str = "all", type_filter: str = "all", search: str = ""):
