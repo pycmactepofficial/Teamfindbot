@@ -809,13 +809,8 @@
 
         function openChat(ownerUserId) {
             if (window.Telegram && Telegram.WebApp) {
-                // Проверяем, существует ли метод openChat
-                if (typeof Telegram.WebApp.openChat === 'function') {
-                    Telegram.WebApp.openChat({ user_id: ownerUserId });
-                } else {
-                    // fallback для старых версий — открываем профиль через tg:// (но он может не работать)
-                    Telegram.WebApp.openTelegramLink(`tg://user?id=${ownerUserId}`);
-                }
+                // Открываем чат
+                Telegram.WebApp.openChat({ user_id: ownerUserId });
             } else {
                 alert('Функция доступна только в Telegram');
             }
