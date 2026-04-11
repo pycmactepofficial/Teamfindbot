@@ -977,6 +977,7 @@
                 const response = await fetch(`/api/data?game=${encodeURIComponent(game)}&type_filter=${encodeURIComponent(type)}&search=${encodeURIComponent(search)}`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
+                console.log(data);
                 const container = document.getElementById('cardsContainer');
                 if (!data || data.length === 0) {
                     container.innerHTML = '<div class="no-results">❌ Никого не найдено</div>';
@@ -1011,7 +1012,7 @@
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(${item.id})">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, ${item.id}, ${item.id}, ${item.id})">✏️ Редактировать</button>
                     <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
