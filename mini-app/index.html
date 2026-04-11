@@ -440,6 +440,70 @@
             border-radius: 8px;
             font-weight: bold;
         }
+        .profile-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: #1f2833;
+            border-radius: 16px;
+            padding: 24px;
+            border: 2px solid #45a29e;
+            margin-bottom: 20px;
+        }
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: #0b0c10;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            border: 3px solid #66fcf1;
+        }
+        .profile-info h2 {
+            color: #fff;
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+        .profile-info p {
+            color: #c5c6c7;
+            font-size: 1rem;
+        }
+        .verification-summary {
+            background: #1f2833;
+            border-radius: 16px;
+            padding: 20px;
+            border: 2px solid #45a29e;
+            margin-bottom: 20px;
+        }
+        .verification-summary h3 {
+            color: #66fcf1;
+            margin-bottom: 15px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .status-clean { background: #2ecc71; color: #0b0c10; }
+        .status-suspicious { background: #e74c3c; color: #fff; }
+        .status-not_checked { background: #95a5a6; color: #fff; }
+        .profile-actions {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .profile-actions .btn {
+            flex: 0 1 auto;
+            padding: 12px 24px;
+        }
     </style>
 </head>
 
@@ -447,6 +511,7 @@
     <div class="header">
         <h1>🎮 TEAM FIND</h1>
         <div class="tabs">
+            <button class="tab" onclick="switchTab(event, 'profile')">👤 Профиль</button>
             <button class="tab active" onclick="switchTab(event, 'search')">🔍 Поиск</button>
             <button class="tab" onclick="switchTab(event, 'my-profiles')">📝 Мои анкеты</button>
             <button class="tab" onclick="switchTab(event, 'create')">➕ Создать</button>
@@ -454,6 +519,30 @@
     </div>
 
     <div class="container">
+        <div id="profile" class="tab-content">
+            <div class="profile-container">
+                <div class="profile-header">
+                    <div class="profile-avatar">👤</div>
+                    <div class="profile-info">
+                        <h2 id="profileName">Загрузка...</h2>
+                        <p id="profileTelegramId">Telegram ID: <span id="profileUserIdSpan"></span></p>
+                    </div>
+                </div>
+
+                <div class="verification-summary" id="verificationSummary">
+                    <h3>🛡️ Статус верификации</h3>
+                    <div id="verificationStatusBlock">Загрузка...</div>
+                </div>
+
+                <div class="profile-actions">
+                    <button class="btn btn-primary" onclick="downloadChecker()">⬇️ Скачать чекер</button>
+                    <button class="btn btn-primary" onclick="showCheckerInstruction()">📋 Инструкция</button>
+                </div>
+
+                <h3 style="margin: 20px 0 15px;">📋 Мои анкеты</h3>
+                <div id="profileProfilesList" class="cards-grid"></div>
+            </div>
+        </div>
         <div id="search" class="tab-content active">
             <div class="filters">
                 <div class="filter-row">
@@ -672,6 +761,96 @@
             }
         }
 
+        // Загрузка данных профиля
+        async function loadProfile() {
+            if (!currentUserId) {
+                document.getElementById('profileName').textContent = 'Не авторизован';
+                document.getElementById('profileUserIdSpan').textContent = '—';
+                document.getElementById('profileProfilesList').innerHTML = '<div class="no-results">Войдите через Telegram</div>';
+                return;
+            }
+            
+            // Имя пользователя из Telegram WebApp
+            let userName = 'Пользователь';
+            if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                userName = user.first_name + (user.last_name ? ' ' + user.last_name : '');
+                document.getElementById('profileName').textContent = userName;
+            } else {
+                document.getElementById('profileName').textContent = `ID: ${currentUserId}`;
+            }
+            document.getElementById('profileUserIdSpan').textContent = currentUserId;
+
+            // Загружаем анкеты пользователя
+            try {
+                const response = await fetch(`/api/user-profiles/${currentUserId}`);
+                const profiles = await response.json();
+                const container = document.getElementById('profileProfilesList');
+                
+                if (!profiles || profiles.length === 0) {
+                    container.innerHTML = '<div class="no-results">У вас нет анкет. Создайте первую!</div>';
+                    document.getElementById('verificationStatusBlock').innerHTML = '<span class="status-badge status-not_checked">Нет анкет</span>';
+                    return;
+                }
+
+                // Рендерим карточки (используем ту же createCard, но с isOwn = true)
+                container.innerHTML = profiles.map(p => createCard(p, true)).join('');
+
+                // Собираем сводку по верификации
+                let hasClean = false, hasSuspicious = false;
+                profiles.forEach(p => {
+                    if (p.cheat_verdict === 'clean') hasClean = true;
+                    if (p.cheat_verdict === 'suspicious') hasSuspicious = true;
+                });
+
+                const statusBlock = document.getElementById('verificationStatusBlock');
+                if (hasSuspicious) {
+                    statusBlock.innerHTML = '<span class="status-badge status-suspicious">⚠️ Обнаружены подозрения</span>';
+                } else if (hasClean) {
+                    statusBlock.innerHTML = '<span class="status-badge status-clean">✅ Пройдена проверка</span>';
+                } else {
+                    statusBlock.innerHTML = '<span class="status-badge status-not_checked">❓ Не проверено</span>';
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки профиля:', err);
+            }
+        }
+
+        // Скачать чекер (прямая ссылка)
+        function downloadChecker() {
+            window.location.href = '/static/verifier.exe';
+        }
+
+        // Показать инструкцию (та же модалка, что и раньше, но без привязки к конкретной анкете)
+        function showCheckerInstruction() {
+            // Показываем общую инструкцию, ID можно не указывать или сказать, что нужно выбрать анкету
+            document.getElementById('verifyProfileIdSpan').textContent = 'ID_АНКЕТЫ';
+            document.getElementById('verifyProfileIdSpan2').textContent = 'ID_АНКЕТЫ';
+            document.getElementById('verifyModal').classList.add('active');
+        }
+
+        // Модифицируем switchTab, чтобы при переключении на 'profile' вызывалась loadProfile()
+        function switchTab(e, tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            if (e) e.target.classList.add('active');
+            else {
+                // Находим кнопку с соответствующим tabName и активируем
+                document.querySelectorAll('.tab').forEach(tab => {
+                    if (tab.textContent.includes(tabName === 'profile' ? 'Профиль' : 
+                        tabName === 'search' ? 'Поиск' : 
+                        tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать')) {
+                        tab.classList.add('active');
+                    }
+                });
+            }
+
+            if (tabName === 'profile') loadProfile();
+            if (tabName === 'my-profiles') loadMyProfiles();
+            if (tabName === 'search') loadSearch();
+        }
+
         // ===== РЕГИСТРАЦИЯ (отправка на бэкенд) =====
         async function registerProfile(e) {
             e.preventDefault();
@@ -857,7 +1036,6 @@
                     body: JSON.stringify(data)
                 });
                 if (response.ok) {
-                    alert('✅ Анкета обновлена');
                     closeEditModal();
                     loadMyProfiles();
                 } else {
