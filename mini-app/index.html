@@ -769,7 +769,7 @@
                 document.getElementById('profileProfilesList').innerHTML = '<div class="no-results">Войдите через Telegram</div>';
                 return;
             }
-            
+
             // Имя пользователя из Telegram WebApp
             let userName = 'Пользователь';
             if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
@@ -1110,8 +1110,6 @@
             if (tabName === 'search') loadSearch();
         }
 
-        
-
         // ===== ЗАПУСК =====
         document.addEventListener('DOMContentLoaded', () => {
             initUserId();
@@ -1142,8 +1140,6 @@
             const defaultBtn = document.querySelector('.type-btn.active');
             if (defaultBtn) selectType({ target: defaultBtn }, 'player');
             else selectType({ target: document.querySelector('.type-btn') }, 'player');
-            // Фикс полей ввода
-            fixInputFocus();
             // Загружаем данные
             loadSearch();
         });
