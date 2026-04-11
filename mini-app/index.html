@@ -419,6 +419,27 @@
             flex-wrap: wrap;
             margin-bottom: 6px;
         }
+        .instruction-code {
+            background: #0b0c10;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #45a29e;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #66fcf1;
+            word-break: break-all;
+            margin: 15px 0;
+        }
+        .download-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #66fcf1;
+            color: #0b0c10;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -785,7 +806,8 @@
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${item.name.replace(/'/g, "\\'")}', '${(item.description || '').replace(/'/g, "\\'")}', '${item.rank.replace(/'/g, "\\'")}')">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openEditModal(...)">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
             } else {
@@ -910,20 +932,7 @@
             if (tabName === 'search') loadSearch();
         }
 
-        // ===== ОБРАБОТЧИКИ ПОЛЕЙ ВВОДА ДЛЯ ПРОКРУТКИ (решает проблему с клавиатурой) =====
-        function fixInputFocus() {
-            const inputs = document.querySelectorAll('input, select, textarea');
-            inputs.forEach(input => {
-                input.addEventListener('focus', () => {
-                    setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
-                });
-                // Для touch устройств
-                input.addEventListener('touchstart', (e) => {
-                    e.stopPropagation();
-                    input.focus();
-                });
-            });
-        }
+        
 
         // ===== ЗАПУСК =====
         document.addEventListener('DOMContentLoaded', () => {
