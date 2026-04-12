@@ -52,6 +52,7 @@ class UserService:
                 )
             """)
             # Миграция: добавляем колонки, если их ещё нет (для существующих БД)
+            await self._migrate_add_user_verification_columns(conn)
             await self._migrate_add_verification_columns(conn)
             await self._migrate_add_team_members(conn)
             await conn.commit()
@@ -62,6 +63,22 @@ class UserService:
         existing = [row['name'] for row in rows]
         if 'team_members' not in existing:
             await conn.execute("ALTER TABLE profiles ADD COLUMN team_members INTEGER DEFAULT NULL")
+    
+    async def _migrate_add_verification_columns(self, conn):
+        """Проверяет и добавляет новые колонки в существующую таблицу profiles."""
+        # Получаем список существующих колонок
+        cursor = await conn.execute("PRAGMA table_info(profiles)")
+        rows = await cursor.fetchall()
+        existing_columns = [row['name'] for row in rows]
+        
+        columns_to_add = {
+            'cheat_verdict': 'TEXT DEFAULT "not_checked"',
+            'cheat_report': 'TEXT',
+            'last_verification': 'TEXT'
+        }
+        for col_name, col_def in columns_to_add.items():
+            if col_name not in existing_columns:
+                await conn.execute(f"ALTER TABLE profiles ADD COLUMN {col_name} {col_def}")
 
     async def _migrate_add_user_verification_columns(self, conn):
         cursor = await conn.execute("PRAGMA table_info(users)")
