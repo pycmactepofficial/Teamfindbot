@@ -863,13 +863,13 @@
                 //    if (p.cheat_verdict === 'suspicious') hasSuspicious = true;
                 //});
 
-                if (hasSuspicious) {
-                    statusBlock.innerHTML = '<span class="status-badge status-suspicious">⚠️ Обнаружены подозрения</span>';
-                } else if (hasClean) {
-                    statusBlock.innerHTML = '<span class="status-badge status-clean">✅ Пройдена проверка</span>';
-                } else {
-                    statusBlock.innerHTML = '<span class="status-badge status-not_checked">❓ Не проверено</span>';
-                }
+                //if (hasSuspicious) {
+                //    statusBlock.innerHTML = '<span class="status-badge status-suspicious">⚠️ Обнаружены подозрения</span>';
+                //} else if (hasClean) {
+                //    statusBlock.innerHTML = '<span class="status-badge status-clean">✅ Пройдена проверка</span>';
+                //} else {
+                //    statusBlock.innerHTML = '<span class="status-badge status-not_checked">❓ Не проверено</span>';
+                //}
             } catch (err) {
                 console.error('Ошибка загрузки профиля:', err);
                 profilesContainer.innerHTML = '<div class="no-results">Ошибка загрузки анкет</div>';
