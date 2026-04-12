@@ -648,17 +648,24 @@
             </div>
             <form id="editForm">
                 <input type="hidden" id="editProfileId">
+                <input type="hidden" id="editType">   <!-- player или team -->
+                <input type="hidden" id="editGame">   <!-- игра для рангов -->
                 <div class="form-group">
-                    <label>Ник</label>
+                    <label>Название / Ник</label>
                     <input type="text" id="editName" required>
+                </div>
+                <div class="form-group" id="editMembersGroup" style="display:none;">
+                    <label>Состав (человек)</label>
+                    <input type="number" id="editMembers" min="1" max="5" value="5">
+                </div>
+                <div class="form-group">
+                    <label>Ранг</label>
+                    <select id="editRankSelect" style="display:none;"></select>
+                    <input type="text" id="editRankInput" placeholder="Ранг">
                 </div>
                 <div class="form-group">
                     <label>Описание</label>
                     <input type="text" id="editDesc">
-                </div>
-                <div class="form-group">
-                    <label>Ранг</label>
-                    <input type="text" id="editRank">
                 </div>
                 <button type="submit" class="btn-submit">Сохранить</button>
             </form>
@@ -872,6 +879,16 @@
             else if (tabName == 'search') loadSearch();
         }
 
+        function fillRankSelect(game, selectedRank) {
+            const select = document.getElementById('editRankSelect');
+            select.innerHTML = '';
+            if (!gameData[game]) return;
+            gameData[game].ranks.forEach(rank => {
+                const option = new Option(rank, rank);
+                if (rank === selectedRank) option.selected = true;
+                select.appendChild(option);
+            });
+        }
 
         // ===== РЕГИСТРАЦИЯ (отправка на бэкенд) =====
         async function registerProfile(e) {
@@ -1004,11 +1021,16 @@
             let details = isPlayer ?
                 `<div><span>Роль:</span> ${item.role || 'N/A'}</div><div><span>Ранг:</span> ${item.rank}</div>` :
                 `<div><span>Ранг:</span> ${item.rank}</div>`;
+
+            let teamMembersHtml = '';
+            if (!isPlayer && item.team_members) {
+                teamMembersHtml = `<div><span>👥 Состав:</span> ${item.team_members}/5</div>`;
+            }
             
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${item.name}', \`${item.description}\`, '${item.rank}')">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${escapeHtml(item.name)}', \`${escapeHtml(item.description || '')}\`, '${item.rank}', '${item.game}', '${item.type}', ${item.team_members || 0})">✏️ Редактировать</button>
                     <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
@@ -1031,11 +1053,35 @@
         }
 
         // ===== РЕДАКТИРОВАНИЕ =====
-        function openEditModal(profileId, name, description, rank) {
+        function openEditModal(profileId, name, description, rank, game, type, members) {
             document.getElementById('editProfileId').value = profileId;
             document.getElementById('editName').value = name;
-            document.getElementById('editDesc').value = description;
-            document.getElementById('editRank').value = rank;
+            document.getElementById('editDesc').value = description || '';
+            document.getElementById('editGame').value = game;
+            document.getElementById('editType').value = type;
+
+            const membersGroup = document.getElementById('editMembersGroup');
+            const rankSelect = document.getElementById('editRankSelect');
+            const rankInput = document.getElementById('editRankInput');
+
+            if (type === 'team') {
+                membersGroup.style.display = 'block';
+                document.getElementById('editMembers').value = members || 5;
+            } else {
+                membersGroup.style.display = 'none';
+            }
+
+            // Заполняем выбор ранга
+            if (gameData[game]) {
+                rankSelect.style.display = 'block';
+                rankInput.style.display = 'none';
+                fillRankSelect(game, rank);
+            } else {
+                rankSelect.style.display = 'none';
+                rankInput.style.display = 'block';
+                rankInput.value = rank;
+            }
+
             document.getElementById('editModal').classList.add('active');
         }
 
@@ -1046,12 +1092,21 @@
         async function updateProfile(e) {
             e.preventDefault();
             const profileId = document.getElementById('editProfileId').value;
+            const type = document.getElementById('editType').value;
+            const game = document.getElementById('editGame').value;
+            
+            let rank = document.getElementById('editRankSelect').value;
+            if (!rank) rank = document.getElementById('editRankInput').value;
+
             const data = {
                 user_id: currentUserId,
                 name: document.getElementById('editName').value,
-                rank: document.getElementById('editRank').value,
+                rank: rank,
                 description: document.getElementById('editDesc').value
             };
+            if (type === 'team') {
+                data.team_members = parseInt(document.getElementById('editMembers').value);
+            }
             try {
                 const response = await fetch(`/api/profile/${profileId}`, {
                     method: 'PUT',
@@ -1061,6 +1116,7 @@
                 if (response.ok) {
                     closeEditModal();
                     loadMyProfiles();
+                    if (document.getElementById('profile').classList.contains('active')) loadProfile();
                 } else {
                     alert('❌ Ошибка обновления');
                 }
