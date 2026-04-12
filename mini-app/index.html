@@ -1088,6 +1088,16 @@
             }
         }
 
+        function openVerifyModal(profileId) {
+            document.getElementById('verifyProfileIdSpan').textContent = profileId;
+            document.getElementById('verifyProfileIdSpan2').textContent = profileId;
+            document.getElementById('verifyModal').classList.add('active');
+        }
+
+        function closeVerifyModal() {
+            document.getElementById('verifyModal').classList.remove('active');
+        }
+
         async function sendInterest(profileId, ownerUserId) {
             if (!currentUserId) {
                 alert('Ошибка: не удалось определить ваш ID');
@@ -1136,6 +1146,13 @@
             if (tabName === 'my-profiles') loadMyProfiles();
             if (tabName === 'search') loadSearch();
         }
+
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('verifyModal');
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
 
         // ===== ЗАПУСК =====
         document.addEventListener('DOMContentLoaded', () => {
