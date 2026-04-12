@@ -1189,6 +1189,18 @@
             }
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+                return c;
+            }).replace(/'/g, "\\'");
+        }
+
         // ===== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК =====
         function switchTab(e, tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
