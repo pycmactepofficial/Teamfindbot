@@ -676,19 +676,19 @@
     <div id="verifyModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>🛡️ Проверка анкеты</h2>
+                <h2>🛡️ Проверка профиля</h2>
                 <button class="modal-close" onclick="closeVerifyModal()">×</button>
             </div>
             <p>Чтобы подтвердить честность игры, скачайте чекер и выполните следующие шаги:</p>
             <ol style="margin: 15px 0 15px 20px; color: #c5c6c7;">
                 <li>Скачайте <strong>чекер</strong> по кнопке ниже.</li>
                 <li>Запустите файл <code>win.exe</code> <strong>от имени администратора</strong>.</li>
-                <li>Введите <strong>ID анкеты</strong>: <span id="verifyProfileIdSpan" style="color:#66fcf1; font-weight:bold;">---</span> и нажмите «Проверить».</li>
-                <li>Дождитесь завершения анализа (обычно 10–30 секунд).</li>
+                <li>Введите <strong>ваш Telegram ID</strong>: <span id="verifyProfileIdSpan" style="color:#66fcf1; font-weight:bold;">---</span> и нажмите enter.</li>
+                <li>Дождитесь завершения анализа (обычно 5–10 минут).</li>
                 <li>Результат автоматически появится в вашем профиле.</li>
             </ol>
             <div class="instruction-code">
-                🔑 ID анкеты: <strong id="verifyProfileIdSpan2">---</strong>
+                🔑 ID вашего профиля в Telegram: <strong id="verifyProfileIdSpan2">---</strong>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 15px;">
                 <button class="btn btn-primary" onclick="downloadChecker()">⬇️ Скачать чекер</button>
@@ -824,6 +824,23 @@
             nameEl.textContent = userName;
             idSpan.textContent = currentUserId;
 
+            try {
+                const resp = await fetch(`/api/user/${currentUserId}/verification-status`);
+                if (resp.ok) {
+                    const status = await resp.json();
+                    const statusBlock = document.getElementById('verificationStatusBlock');
+                    if (status.is_valid) {
+                        statusBlock.innerHTML = `<span class="status-badge status-clean">✅ Верифицирован до ${new Date(status.expires_at).toLocaleDateString()}</span>`;
+                    } else if (status.verdict === 'suspicious') {
+                        statusBlock.innerHTML = `<span class="status-badge status-suspicious">⚠️ Обнаружены нарушения</span>`;
+                    } else {
+                        statusBlock.innerHTML = `<span class="status-badge status-not_checked">❓ Не верифицирован</span>`;
+                    }
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки статуса верификации:', err);
+            }
+
             // Загружаем анкеты
             try {
                 const response = await fetch(`/api/user-profiles/${currentUserId}`);
@@ -840,11 +857,11 @@
                 profilesContainer.innerHTML = profiles.map(p => createCard(p, true)).join('');
 
                 // Сводка верификации
-                let hasClean = false, hasSuspicious = false;
-                profiles.forEach(p => {
-                    if (p.cheat_verdict === 'clean') hasClean = true;
-                    if (p.cheat_verdict === 'suspicious') hasSuspicious = true;
-                });
+                //let hasClean = false, hasSuspicious = false;
+                //profiles.forEach(p => {
+                //    if (p.cheat_verdict === 'clean') hasClean = true;
+                //    if (p.cheat_verdict === 'suspicious') hasSuspicious = true;
+                //});
 
                 if (hasSuspicious) {
                     statusBlock.innerHTML = '<span class="status-badge status-suspicious">⚠️ Обнаружены подозрения</span>';
@@ -1010,9 +1027,9 @@
             const gameIcon = icons[item.game] || '🎮';
             
             // Статус верификации
-            const verdict = item.cheat_verdict || 'not_checked';
+            const verdict = item.user_verdict || 'not_checked';  // <-- теперь из users
             const verdictText = {
-                'clean': '✅ Чист',
+                'clean': '✅ Верифицирован',
                 'suspicious': '⚠️ Подозрение',
                 'not_checked': '❓ Не проверен'
             }[verdict] || '❓ Не проверен';
@@ -1141,8 +1158,8 @@
         }
 
         function openVerifyModal(profileId) {
-            document.getElementById('verifyProfileIdSpan').textContent = profileId;
-            document.getElementById('verifyProfileIdSpan2').textContent = profileId;
+            document.getElementById('verifyProfileIdSpan').textContent = currentUserId;
+            document.getElementById('verifyProfileIdSpan2').textContent = currentUserId;
             document.getElementById('verifyModal').classList.add('active');
         }
 

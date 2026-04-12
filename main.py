@@ -158,7 +158,7 @@ async def register(data: dict):
                 game=data['game'],
                 rank=data['rank'],
                 members=data['members'],
-                description=data['description']
+                description=data.get('description', '')
             )
         return {"status": "success", **result}
     except Exception as e:
@@ -182,6 +182,7 @@ async def update_profile(profile_id: int, data: dict):
         if user_id == 0:
             raise ValueError("user_id required")
         update_data = {k: v for k, v in data.items() if k != 'user_id'}
+        # Проверка: если тип команды, то обновляем team_members
         success = await usersservice.user_service.update_profile(user_id, profile_id, **update_data)
         if success:
             return {"status": "success"}
@@ -190,31 +191,29 @@ async def update_profile(profile_id: int, data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/api/profile/{profile_id}/verification")
-async def receive_verification_report(profile_id: int, report: VerificationReport):
+@app.get("/api/user/{user_id}/verification-status")
+async def get_user_verification_status(user_id: int):
+    try:
+        status = await usersservice.user_service.get_user_verification_status(user_id)
+        return JSONResponse(content=status)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/api/user/{user_id}/verification")
+async def receive_user_verification_report(user_id: int, report: VerificationReport):
     """
-    Принимает отчёт от клиента античита.
-    Клиент должен передать JSON с полями:
-    {
-        "user_id": 123,
-        "timestamp": "2026-04-11T15:30:00Z",
-        "verdict": "clean" или "suspicious",
-        "findings": { ... }
-    }
+    Принимает отчёт от клиента античита для верификации пользователя.
     """
     try:
-        # Проверяем, что профиль существует
-        profile = await usersservice.user_service.get_profile_by_id(profile_id)
-        if not profile:
-            raise HTTPException(status_code=404, detail="Profile not found")
+        # Проверяем, существует ли пользователь
+        user = await usersservice.user_service._get_user_by_user_id(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
         
-        # Сохраняем результат в БД
-        success = await usersservice.user_service.save_verification_result(
-            profile_id, 
-            report.dict()
-        )
+        # Сохраняем результат верификации
+        success = await usersservice.user_service.save_user_verification(user_id, report.dict())
         if success:
-            return {"status": "success", "message": "Verification report saved"}
+            return {"status": "success", "message": "Verification report saved for user"}
         else:
             raise HTTPException(status_code=500, detail="Failed to save report")
     except Exception as e:

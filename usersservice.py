@@ -53,25 +53,30 @@ class UserService:
             """)
             # Миграция: добавляем колонки, если их ещё нет (для существующих БД)
             await self._migrate_add_verification_columns(conn)
+            await self._migrate_add_team_members(conn)
             await conn.commit()
 
-    async def _migrate_add_verification_columns(self, conn):
-        """Проверяет и добавляет новые колонки в существующую таблицу profiles."""
-        # Получаем список существующих колонок
+    async def _migrate_add_team_members(self, conn):
         cursor = await conn.execute("PRAGMA table_info(profiles)")
         rows = await cursor.fetchall()
-        existing_columns = [row['name'] for row in rows]
-        
-        columns_to_add = {
-            'cheat_verdict': 'TEXT DEFAULT "not_checked"',
-            'cheat_report': 'TEXT',
-            'last_verification': 'TEXT'
-        }
-        for col_name, col_def in columns_to_add.items():
-            if col_name not in existing_columns:
-                await conn.execute(f"ALTER TABLE profiles ADD COLUMN {col_name} {col_def}")
+        existing = [row['name'] for row in rows]
+        if 'team_members' not in existing:
+            await conn.execute("ALTER TABLE profiles ADD COLUMN team_members INTEGER DEFAULT NULL")
 
-    # ---------- Существующие методы (оставлены без изменений) ----------
+    async def _migrate_add_user_verification_columns(self, conn):
+        cursor = await conn.execute("PRAGMA table_info(users)")
+        rows = await cursor.fetchall()
+        existing = [row['name'] for row in rows]
+        if 'verification_verdict' not in existing:
+            await conn.execute("ALTER TABLE users ADD COLUMN verification_verdict TEXT DEFAULT 'not_checked'")
+        if 'verification_expires_at' not in existing:
+            await conn.execute("ALTER TABLE users ADD COLUMN verification_expires_at TEXT")
+        if 'verification_report' not in existing:
+            await conn.execute("ALTER TABLE users ADD COLUMN verification_report TEXT")
+        if 'verification_updated_at' not in existing:
+            await conn.execute("ALTER TABLE users ADD COLUMN verification_updated_at TEXT")
+        await conn.commit()
+
     async def _get_user_by_chat_id(self, chat_id: int) -> Optional[Dict]:
         async with self._get_connection() as conn:
             async with conn.execute("SELECT * FROM users WHERE chat_id = ?", (chat_id,)) as cursor:
@@ -159,9 +164,7 @@ class UserService:
         if not user:
             await self.add_or_update_user(user_id, user_id)
 
-        full_desc = f"Состав: {members}/5\n{description}" if description else f"Состав: {members}/5"
         now = datetime.now().isoformat()
-
         async with self._get_connection() as conn:
             async with conn.execute(
                 "SELECT id FROM profiles WHERE user_id = ? AND type = 'team' AND name = ?",
@@ -173,18 +176,18 @@ class UserService:
                 profile_id = existing[0]
                 await conn.execute(
                     """UPDATE profiles
-                       SET game = ?, rank = ?, description = ?, updated_at = ?
-                       WHERE id = ?""",
-                    (game, rank, full_desc, now, profile_id)
+                    SET game = ?, rank = ?, description = ?, team_members = ?, updated_at = ?
+                    WHERE id = ?""",
+                    (game, rank, description, members, now, profile_id)
                 )
                 await conn.commit()
                 return {"status": "updated", "id": profile_id}
             else:
                 cursor = await conn.execute(
                     """INSERT INTO profiles
-                       (user_id, type, name, game, rank, description, created_at, updated_at)
-                       VALUES (?, 'team', ?, ?, ?, ?, ?, ?)""",
-                    (user_id, name, game, rank, full_desc, now, now)
+                    (user_id, type, name, game, rank, description, team_members, created_at, updated_at)
+                    VALUES (?, 'team', ?, ?, ?, ?, ?, ?, ?)""",
+                    (user_id, name, game, rank, description, members, now, now)
                 )
                 await conn.commit()
                 return {"status": "success", "id": cursor.lastrowid}
@@ -199,7 +202,7 @@ class UserService:
             return cursor.rowcount > 0
 
     async def update_profile(self, user_id: int, profile_id: int, **kwargs) -> bool:
-        allowed = {'name', 'game', 'role', 'rank', 'description'}
+        allowed = {'name', 'game', 'role', 'rank', 'description', 'team_members'}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -216,17 +219,20 @@ class UserService:
 
     async def get_user_profiles(self, user_id: int) -> List[Dict]:
         async with self._get_connection() as conn:
-            async with conn.execute(
-                "SELECT * FROM profiles WHERE user_id = ? ORDER BY updated_at DESC",
-                (user_id,)
-            ) as cursor:
+            async with conn.execute("""
+                SELECT profiles.*, users.verification_verdict AS user_verdict
+                FROM profiles
+                JOIN users ON profiles.user_id = users.user_id
+                WHERE profiles.user_id = ?
+                ORDER BY profiles.updated_at DESC
+            """, (user_id,)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
     async def get_all_data(self) -> List[Dict]:
         async with self._get_connection() as conn:
             async with conn.execute("""
-                SELECT profiles.*, users.user_id AS owner_user_id
+                SELECT profiles.*, users.user_id AS owner_user_id, users.verification_verdict AS user_verdict
                 FROM profiles
                 JOIN users ON profiles.user_id = users.user_id
             """) as cursor:
@@ -240,7 +246,7 @@ class UserService:
 
     async def search(self, game: Optional[str] = None, type_filter: Optional[str] = None, search_text: Optional[str] = None) -> List[Dict]:
         query = """
-            SELECT profiles.*, users.user_id AS owner_user_id
+            SELECT profiles.*, users.user_id AS owner_user_id, users.verification_verdict AS user_verdict
             FROM profiles
             JOIN users ON profiles.user_id = users.user_id
             WHERE 1=1
@@ -275,6 +281,49 @@ class UserService:
                 return result
 
     # ---------- НОВЫЕ МЕТОДЫ ДЛЯ ВЕРИФИКАЦИИ ----------
+    async def save_user_verification(self, user_id: int, report: dict) -> bool:
+        """
+        Сохраняет результат верификации пользователя.
+        Устанавливает вердикт и время истечения (через 2 дня).
+        """
+        verdict = report.get('verdict', 'unknown')
+        findings = report.get('findings', {})
+        report_json = json.dumps(findings)
+        now = datetime.now().isoformat()
+        expires_at = (datetime.now() + timedelta(days=2)).isoformat()
+
+        async with self._get_connection() as conn:
+            cursor = await conn.execute("""
+                UPDATE users
+                SET verification_verdict = ?,
+                    verification_expires_at = ?,
+                    verification_report = ?,
+                    verification_updated_at = ?
+                WHERE user_id = ?
+            """, (verdict, expires_at, report_json, now, user_id))
+            await conn.commit()
+            return cursor.rowcount > 0
+        
+    async def get_user_verification_status(self, user_id: int) -> dict:
+        """Возвращает статус верификации пользователя с учётом срока действия."""
+        async with self._get_connection() as conn:
+            async with conn.execute(
+                "SELECT verification_verdict, verification_expires_at, verification_updated_at FROM users WHERE user_id = ?",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if not row:
+                    return {"verdict": "not_checked", "is_valid": False, "expires_at": None}
+                verdict = row['verification_verdict'] or 'not_checked'
+                expires_at = row['verification_expires_at']
+                is_valid = (verdict == 'clean' and expires_at and datetime.now().isoformat() < expires_at)
+                return {
+                    "verdict": verdict,
+                    "is_valid": is_valid,
+                    "expires_at": expires_at,
+                    "updated_at": row['verification_updated_at']
+                }
+        
     async def save_verification_result(self, profile_id: int, report: dict) -> bool:
         """
         Сохраняет JSON-отчёт от античита и вычисляет вердикт.
