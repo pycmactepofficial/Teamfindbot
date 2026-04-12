@@ -841,35 +841,6 @@
             document.getElementById('verifyModal').classList.add('active');
         }
 
-        // Модифицируем switchTab, чтобы при переключении на 'profile' вызывалась loadProfile()
-        function switchTab(e, tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            if (e) e.target.classList.add('active');
-            else {
-                document.querySelectorAll('.tab').forEach(tab => {
-                    if (tab.textContent.includes(
-                        tabName === 'profile' ? 'Профиль' : 
-                        tabName === 'search' ? 'Поиск' : 
-                        tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать'
-                    )) {
-                        tab.classList.add('active');
-                    }
-                });
-            }
-
-            // Убедимся, что ID есть перед загрузкой
-            if (!currentUserId) {
-                initUserId();
-                setTimeout(() => {
-                    if (currentUserId) loadTabContent(tabName);
-                }, 100);
-            } else {
-                loadTabContent(tabName);
-            }
-        }
-
         function loadTabContent(tabName) {
             if (tabName == 'profile') loadProfile();
             else if (tabName == 'my-profiles') loadMyProfiles();
@@ -1143,8 +1114,20 @@
             document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
             if (e) e.target.classList.add('active');
-            if (tabName === 'my-profiles') loadMyProfiles();
-            if (tabName === 'search') loadSearch();
+            else {
+                document.querySelectorAll('.tab').forEach(tab => {
+                    if (tab.textContent.includes(
+                        tabName === 'profile' ? 'Профиль' : 
+                        tabName === 'search' ? 'Поиск' : 
+                        tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать'
+                    )) {
+                        tab.classList.add('active');
+                    }
+                });
+            }
+
+            // Загрузка
+            loadTabContent(tabName);
         }
 
         window.addEventListener('click', (e) => {
