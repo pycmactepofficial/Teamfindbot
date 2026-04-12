@@ -768,6 +768,8 @@
             const profilesContainer = document.getElementById('profileProfilesList');
             const statusBlock = document.getElementById('verificationStatusBlock');
 
+            alert("loadProfile вызван");
+
             // Заглушка на случай, если currentUserId ещё не пришёл
             if (!currentUserId) {
                 nameEl.textContent = 'Загрузка...';
