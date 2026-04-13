@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 import json
 import re
 from typing import Optional
+import aiohttp
 
 logging.basicConfig(level=logging.INFO)
 
@@ -122,6 +123,31 @@ async def steam_login(user_id: int):
     steam_login_url = "https://steamcommunity.com/openid/login?" + urlencode(params)
     logging.info(f"Redirecting to Steam login for user_id={user_id}")
     return RedirectResponse(steam_login_url)
+
+@app.get("/api/steam/userinfo")
+async def get_steam_userinfo(user_id: int):
+    steam_id = await usersservice.user_service.get_steam_id(user_id)
+    if not steam_id:
+        return {"linked": False, "personaname": None}
+    if not STEAM_API_KEY:
+        return {"linked": True, "personaname": None, "error": "No API key"}
+    url = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
+    params = {
+        'key': STEAM_API_KEY,
+        'steamids': steam_id
+    }
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, params=params) as resp:
+                data = await resp.json()
+                players = data.get('response', {}).get('players', [])
+                if players:
+                    personaname = players[0].get('personaname', '')
+                    return {"linked": True, "personaname": personaname}
+                return {"linked": True, "personaname": None}
+        except Exception as e:
+            logging.exception(f"Error fetching Steam user info: {e}")
+            return {"linked": True, "personaname": None}
 
 @app.get("/auth/steam/callback")
 async def steam_callback(request: Request, user_id: Optional[int] = None):

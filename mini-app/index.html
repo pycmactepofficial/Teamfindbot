@@ -826,6 +826,25 @@
             }
         }
 
+        async function loadSteamUserInfo() {
+            if (!currentUserId) return;
+            try {
+                const resp = await fetch(`/api/steam/userinfo?user_id=${currentUserId}`);
+                const data = await resp.json();
+                if (data.linked && data.personaname) {
+                    const nameInput = document.getElementById('regName');
+                    nameInput.value = data.personaname;
+                    nameInput.readOnly = true;  // не даём изменять
+                    nameInput.style.opacity = '0.7';
+                } else {
+                    // Если Steam не привязан – поле editable, но можно предупредить
+                    document.getElementById('regName').readOnly = false;
+                }
+            } catch(e) {
+                console.error('Failed to load Steam user info', e);
+            }
+        }
+
         function updatePlaytimeForGame(gameName) {
             const playtimeDiv = document.getElementById('steamPlaytimeInfo');
             if (!steamGames.length) {
@@ -1037,30 +1056,24 @@
         // ===== РЕГИСТРАЦИЯ (отправка на бэкенд) =====
         async function registerProfile(e) {
             e.preventDefault();
-
             if (!currentUserId) {
-                alert('❌ Ошибка: нет ID пользователя. Перезагрузите страницу.');
+                alert('❌ Ошибка: нет ID пользователя.');
                 return;
             }
 
             let data;
             if (currentType === 'player') {
                 const name = document.getElementById('regName').value.trim();
+                if (!name) { alert('Введите ник игрока'); return; }
+                const game = document.getElementById('regGame').value; 
                 let steamPlaytime = 0;
                 const steamGame = steamGames.find(g => g.name.toLowerCase() === game.toLowerCase());
-                if (steamGame) {
-                    steamPlaytime = steamGame.playtime_minutes;
-                }
-
-                if (!name) {
-                    alert('Введите ник игрока');
-                    return;
-                }
+                if (steamGame) steamPlaytime = steamGame.playtime_minutes;
                 data = {
                     user_id: currentUserId,
                     type: 'player',
                     name: name,
-                    game: document.getElementById('regGame').value,
+                    game: game,
                     role: document.getElementById('regRole').value,
                     rank: document.getElementById('regRank').value,
                     description: document.getElementById('regDesc').value,
@@ -1068,10 +1081,7 @@
                 };
             } else {
                 const name = document.getElementById('teamName').value.trim();
-                if (!name) {
-                    alert('Введите название команды');
-                    return;
-                }
+                if (!name) { alert('Введите название команды'); return; }
                 data = {
                     user_id: currentUserId,
                     type: 'team',
@@ -1091,18 +1101,12 @@
                 });
                 const result = await response.json();
                 if (response.ok) {
+                    alert('✅ Анкета создана!');
                     document.getElementById('regForm').reset();
-                    // Восстанавливаем required после сброса
-                    if (currentType === 'player') {
-                        document.getElementById('regName').required = true;
-                        document.getElementById('teamName').required = false;
-                    } else {
-                        document.getElementById('regName').required = false;
-                        document.getElementById('teamName').required = true;
-                    }
+                    loadMyProfiles();
                     switchTab(null, 'my-profiles');
                 } else {
-                    alert('❌ Ошибка сервера: ' + (result.detail || 'Неизвестная ошибка'));
+                    alert('❌ Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
                 }
             } catch (err) {
                 alert('❌ Ошибка запроса: ' + err.message);
@@ -1413,6 +1417,7 @@
             loadSearch();
             loadProfile();
             loadSteamGames();
+            loadSteamUserInfo();
             checkSteamStatus(); 
         });
     </script>
