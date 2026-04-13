@@ -813,9 +813,9 @@
                     steamGames = await resp.json();
                     // Обновим отображение статуса Steam в профиле
                     if (steamGames.length > 0) {
-                        document.getElementById('steamLinkedStatus').innerHTML = '✅ привязан';
+                        document.getElementById('steamLinkedStatus').innerHTML = '✅ Привязан';
                     } else {
-                        document.getElementById('steamLinkedStatus').innerHTML = '❌ не привязан или нет игр';
+                        document.getElementById('steamLinkedStatus').innerHTML = '❌ Не привязан или нет игр';
                     }
                 } else {
                     document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка';
