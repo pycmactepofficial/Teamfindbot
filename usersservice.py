@@ -193,14 +193,8 @@ class UserService:
                 existing = await cursor.fetchone()
             if existing:
                 # Обновляем
-                await conn.execute(
-                    """UPDATE profiles
-                       SET name = ?, role = ?, rank = ?, description = ?, steam_playtime = ?, updated_at = ?
-                       WHERE id = ?""",
-                    (name, role, rank, description, steam_playtime, now, existing[0])
-                )
-                await conn.commit()
-                return {"status": "updated", "id": existing[0]}
+
+                return {"status": "error", "id": existing[0], "detail": "Анкета уже существует"}
             else:
                 cursor = await conn.execute(
                     """INSERT INTO profiles

@@ -211,6 +211,8 @@ async def register(data: dict):
                 description=data.get('description', ''),
                 steam_playtime=data.get('steam_playtime', 0)
             )
+            if result["status"] == "error":
+                return {"status": "error", **result}
         else:
             result = await usersservice.user_service.add_team(
                 user_id=user_id,
