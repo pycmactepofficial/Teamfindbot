@@ -7,7 +7,6 @@
     <title>Team Find</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Твои старые стили, оставь как есть (я их сократил для краткости, но ты можешь вставить свои полные) */
         * {
             margin: 0;
             padding: 0;
@@ -401,24 +400,29 @@
             background: #0b0c10;
             border: 1px solid;
         }
+
         .verdict-clean {
             color: #2ecc71;
             border-color: #2ecc71;
         }
+
         .verdict-suspicious {
             color: #e74c3c;
             border-color: #e74c3c;
         }
+
         .verdict-not_checked {
             color: #95a5a6;
             border-color: #95a5a6;
         }
+
         .card-header {
             display: flex;
             align-items: center;
             flex-wrap: wrap;
             margin-bottom: 6px;
         }
+
         .instruction-code {
             background: #0b0c10;
             padding: 12px;
@@ -430,6 +434,7 @@
             word-break: break-all;
             margin: 15px 0;
         }
+
         .download-link {
             display: inline-block;
             margin-top: 15px;
@@ -440,10 +445,12 @@
             border-radius: 8px;
             font-weight: bold;
         }
+
         .profile-container {
             max-width: 800px;
             margin: 0 auto;
         }
+
         .profile-header {
             display: flex;
             align-items: center;
@@ -454,6 +461,7 @@
             border: 2px solid #45a29e;
             margin-bottom: 20px;
         }
+
         .profile-avatar {
             width: 80px;
             height: 80px;
@@ -465,15 +473,18 @@
             font-size: 40px;
             border: 3px solid #66fcf1;
         }
+
         .profile-info h2 {
             color: #fff;
             font-size: 1.8rem;
             margin-bottom: 8px;
         }
+
         .profile-info p {
             color: #c5c6c7;
             font-size: 1rem;
         }
+
         .verification-summary {
             background: #1f2833;
             border-radius: 16px;
@@ -481,10 +492,12 @@
             border: 2px solid #45a29e;
             margin-bottom: 20px;
         }
+
         .verification-summary h3 {
             color: #66fcf1;
             margin-bottom: 15px;
         }
+
         .status-badge {
             display: inline-block;
             padding: 6px 16px;
@@ -492,14 +505,28 @@
             font-weight: bold;
             font-size: 1.2rem;
         }
-        .status-clean { background: #2ecc71; color: #0b0c10; }
-        .status-suspicious { background: #e74c3c; color: #fff; }
-        .status-not_checked { background: #95a5a6; color: #fff; }
+
+        .status-clean {
+            background: #2ecc71;
+            color: #0b0c10;
+        }
+
+        .status-suspicious {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .status-not_checked {
+            background: #95a5a6;
+            color: #fff;
+        }
+
         .profile-actions {
             display: flex;
             gap: 15px;
             margin-bottom: 20px;
         }
+
         .profile-actions .btn {
             flex: 0 1 auto;
             padding: 12px 24px;
@@ -526,6 +553,7 @@
                     <div class="profile-info">
                         <h2 id="profileName">Загрузка...</h2>
                         <p id="profileTelegramId">Telegram ID: <span id="profileUserIdSpan"></span></p>
+                        <p id="steamStatus">Steam: <span id="steamLinkedStatus">не привязан</span></p>
                     </div>
                 </div>
 
@@ -535,6 +563,7 @@
                 </div>
 
                 <div class="profile-actions">
+                    <button class="btn btn-primary" onclick="linkSteam()">🔗 Привязать Steam</button>
                     <button class="btn btn-primary" onclick="downloadChecker()">⬇️ Скачать чекер</button>
                     <button class="btn btn-primary" onclick="showCheckerInstruction()">📋 Инструкция</button>
                 </div>
@@ -607,6 +636,9 @@
                                 <select id="regRank"></select>
                             </div>
                         </div>
+                        <div id="steamPlaytimeInfo" class="playtime-info" style="display:none;">
+                            🎮 Время в Steam: <span id="playtimeHours">0</span> ч.
+                        </div>
                     </div>
                     <div id="teamFields" style="display: none;">
                         <div class="form-group">
@@ -648,8 +680,8 @@
             </div>
             <form id="editForm">
                 <input type="hidden" id="editProfileId">
-                <input type="hidden" id="editType">   <!-- player или team -->
-                <input type="hidden" id="editGame">   <!-- игра для рангов -->
+                <input type="hidden" id="editType"> <!-- player или team -->
+                <input type="hidden" id="editGame"> <!-- игра для рангов -->
                 <div class="form-group">
                     <label>Название / Ник</label>
                     <input type="text" id="editName" required>
@@ -683,7 +715,8 @@
             <ol style="margin: 15px 0 15px 20px; color: #c5c6c7;">
                 <li>Скачайте <strong>чекер</strong> по кнопке ниже.</li>
                 <li>Запустите файл <code>win.exe</code> <strong>от имени администратора</strong>.</li>
-                <li>Введите <strong>ваш Telegram ID</strong>: <span id="verifyProfileIdSpan" style="color:#66fcf1; font-weight:bold;">---</span> и нажмите enter.</li>
+                <li>Введите <strong>ваш Telegram ID</strong>: <span id="verifyProfileIdSpan"
+                        style="color:#66fcf1; font-weight:bold;">---</span> и нажмите enter.</li>
                 <li>Дождитесь завершения анализа (обычно 5–10 минут).</li>
                 <li>Результат автоматически появится в вашем профиле.</li>
             </ol>
@@ -700,11 +733,30 @@
     <script>
         // ===== ДАННЫЕ =====
         const gameData = {
-            'CS2': { roles: ['AWPer', 'Rifler', 'IGL', 'Support', 'Lurker'], ranks: ['Silver', 'Gold', 'Master Guardian', 'Distinguished Master Guardian', 'Legendary Eagle', 'Supreme', 'Global Elite'] },
-            'Valorant': { roles: ['Duelist', 'Controller', 'Initiator', 'Sentinel'], ranks: ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ascendant', 'Immortal', 'Radiant'] },
-            'Dota 2': { roles: ['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'], ranks: ['Herald', 'Guardian', 'Crusader', 'Archon', 'Legend', 'Ancient', 'Divine', 'Immortal'] },
-            'Fortnite': { roles: ['Builder', 'Shooter', 'Flex'], ranks: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Elite', 'Champion', 'Unreal'] },
-            'LoL': { roles: ['Top', 'Jungle', 'Mid', 'ADC', 'Support'], ranks: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Grandmaster', 'Challenger'] }
+            'CS2': {
+                roles: ['AWPer', 'Rifler', 'IGL', 'Support', 'Lurker'],
+                ranks: ['Silver', 'Gold', 'Master Guardian', 'Distinguished Master Guardian', 'Legendary Eagle', 'Supreme', 'Global Elite']
+            },
+
+            'Valorant': {
+                roles: ['Duelist', 'Controller', 'Initiator', 'Sentinel'],
+                ranks: ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ascendant', 'Immortal', 'Radiant']
+            },
+
+            'Dota 2': {
+                roles: ['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'],
+                ranks: ['Herald', 'Guardian', 'Crusader', 'Archon', 'Legend', 'Ancient', 'Divine', 'Immortal']
+            },
+
+            'Fortnite': {
+                roles: ['Builder', 'Shooter', 'Flex'],
+                ranks: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Elite', 'Champion', 'Unreal']
+            },
+
+            'LoL': {
+                roles: ['Top', 'Jungle', 'Mid', 'ADC', 'Support'],
+                ranks: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Master', 'Grandmaster', 'Challenger']
+            }
         };
 
         let currentUserId = null;
@@ -734,6 +786,52 @@
             } else {
                 console.warn('⚠️ Не в Telegram, тестовый ID 123');
                 currentUserId = 123;
+            }
+        }
+
+        function linkSteam() {
+            if (!currentUserId) {
+                alert('ID пользователя не определён');
+                return;
+            }
+            window.location.href = `/auth/steam?user_id=${currentUserId}`;
+        }
+
+        async function loadSteamGames() {
+            if (!currentUserId) return;
+            try {
+                const resp = await fetch(`/api/steam/games?user_id=${currentUserId}`);
+                if (resp.ok) {
+                    steamGames = await resp.json();
+                    // Обновим отображение статуса Steam в профиле
+                    if (steamGames.length > 0) {
+                        document.getElementById('steamLinkedStatus').innerHTML = '✅ привязан';
+                    } else {
+                        document.getElementById('steamLinkedStatus').innerHTML = '❌ не привязан или нет игр';
+                    }
+                } else {
+                    document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка';
+                }
+            } catch (e) {
+                console.error('Steam games load error', e);
+                document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка';
+            }
+        }
+
+        function updatePlaytimeForGame(gameName) {
+            const playtimeDiv = document.getElementById('steamPlaytimeInfo');
+            if (!steamGames.length) {
+                playtimeDiv.style.display = 'none';
+                return;
+            }
+            // Ищем игру по названию (приблизительно)
+            const game = steamGames.find(g => g.name.toLowerCase() === gameName.toLowerCase());
+            if (game) {
+                const hours = Math.floor(game.playtime_minutes / 60);
+                document.getElementById('playtimeHours').innerText = hours;
+                playtimeDiv.style.display = 'block';
+            } else {
+                playtimeDiv.style.display = 'none';
             }
         }
 
@@ -793,7 +891,7 @@
             }
         }
 
-        // Загрузка данных профиля
+        // ПРОФИЛЬ
         async function loadProfile() {
             const nameEl = document.getElementById('profileName');
             const idSpan = document.getElementById('profileUserIdSpan');
@@ -832,13 +930,13 @@
                     if (status.is_valid) {
                         statusBlock.innerHTML = `<span class="status-badge status-clean">✅ Верифицирован до ${new Date(status.expires_at).toLocaleDateString()}</span>`;
                     } else if (status.verdict === 'suspicious') {
-                        statusBlock.innerHTML = `<span class="status-badge status-suspicious">⚠️ Обнаружены нарушения</span>`;
+                        statusBlock.innerHTML = `<span class="status-badge status-suspicious">⚠️ Обнаружены подозрения  </span>`;
                     } else {
                         statusBlock.innerHTML = `<span class="status-badge status-not_checked">❓ Не верифицирован</span>`;
                     }
                 }
             } catch (err) {
-                console.error('Ошибка загрузки статуса верификации:', err);
+                console.error('Ошибка загрузки статуса верификации: ', err);
             }
 
             // Загружаем анкеты
@@ -877,14 +975,13 @@
             }
         }
 
-        // Скачать чекер (прямая ссылка)
+        // Скачать чекер
         function downloadChecker() {
             window.location.href = '/static/win.exe';
         }
 
-        // Показать инструкцию (та же модалка, что и раньше, но без привязки к конкретной анкете)
+        // Показать инструкцию
         function showCheckerInstruction() {
-            // Показываем общую инструкцию, ID можно не указывать или сказать, что нужно выбрать анкету
             document.getElementById('verifyProfileIdSpan').textContent = currentUserId;
             document.getElementById('verifyProfileIdSpan2').textContent = currentUserId;
             document.getElementById('verifyModal').classList.add('active');
@@ -919,6 +1016,12 @@
             let data;
             if (currentType === 'player') {
                 const name = document.getElementById('regName').value.trim();
+                let steamPlaytime = 0;
+                const steamGame = steamGames.find(g => g.name.toLowerCase() === game.toLowerCase());
+                if (steamGame) {
+                    steamPlaytime = steamGame.playtime_minutes;
+                }
+
                 if (!name) {
                     alert('Введите ник игрока');
                     return;
@@ -930,7 +1033,8 @@
                     game: document.getElementById('regGame').value,
                     role: document.getElementById('regRole').value,
                     rank: document.getElementById('regRank').value,
-                    description: document.getElementById('regDesc').value
+                    description: document.getElementById('regDesc').value,
+                    steam_playtime: steamPlaytime
                 };
             } else {
                 const name = document.getElementById('teamName').value.trim();
@@ -957,7 +1061,6 @@
                 });
                 const result = await response.json();
                 if (response.ok) {
-                    alert('✅ Анкета создана!');
                     document.getElementById('regForm').reset();
                     // Восстанавливаем required после сброса
                     if (currentType === 'player') {
@@ -967,7 +1070,6 @@
                         document.getElementById('regName').required = false;
                         document.getElementById('teamName').required = true;
                     }
-                    loadMyProfiles();
                     switchTab(null, 'my-profiles');
                 } else {
                     alert('❌ Ошибка сервера: ' + (result.detail || 'Неизвестная ошибка'));
@@ -977,7 +1079,7 @@
             }
         }
 
-        // ===== ЗАГРУЗКА МОИХ АНКЕТ =====
+        // ЗАГРУЗКА МОИХ АНКЕТ
         async function loadMyProfiles() {
             if (!currentUserId) {
                 document.getElementById('myProfilesContainer').innerHTML = '<div class="no-results">❌ Нет ID пользователя</div>';
@@ -998,7 +1100,7 @@
             }
         }
 
-        // ===== ПОИСК =====
+        // ПОИСК 
         async function loadSearch() {
             const game = document.getElementById('gameFilter').value;
             const type = document.getElementById('typeFilter').value;
@@ -1019,31 +1121,27 @@
             }
         }
 
-        // ===== СОЗДАНИЕ КАРТОЧКИ =====
+        // СОЗДАНИЕ КАРТОЧКИ
         function createCard(item, isOwn) {
             const isPlayer = item.type === 'player';
             const typeLabel = isPlayer ? '👤 ИГРОК' : '👥 КОМАНДА';
             const icons = { 'CS2': '🎯', 'Valorant': '🔫', 'Dota 2': '⚔️', 'Fortnite': '🛸', 'LoL': '🏆' };
             const gameIcon = icons[item.game] || '🎮';
-            
-            // Статус верификации
-            const verdict = item.user_verdict || 'not_checked';  // <-- теперь из users
-            const verdictText = {
-                'clean': '✅ Верифицирован',
-                'suspicious': '⚠️ Подозрение',
-                'not_checked': '❓ Не проверен'
-            }[verdict] || '❓ Не проверен';
+            const verdict = item.user_verdict || 'not_checked';
+            const verdictText = { 'clean': '✅ Верифицирован', 'suspicious': '⚠️ Подозрение', 'not_checked': '❓ Не проверен' }[verdict] || '❓ Не проверен';
             const verdictClass = `verdict-${verdict}`;
-            
+
             let details = isPlayer ?
                 `<div><span>Роль:</span> ${item.role || 'N/A'}</div><div><span>Ранг:</span> ${item.rank}</div>` :
                 `<div><span>Ранг:</span> ${item.rank}</div>`;
-
-            let teamMembersHtml = '';
-            if (!isPlayer && item.team_members) {
-                teamMembersHtml = `<div><span>👥 Состав:</span> ${item.team_members}/5</div>`;
+            if (isPlayer && item.steam_playtime) {
+                const hours = Math.floor(item.steam_playtime / 60);
+                details += `<div><span>🎮 Часы в Steam:</span> ${hours} ч.</div>`;
             }
-            
+            if (!isPlayer && item.team_members) {
+                details += `<div><span>👥 Состав:</span> ${item.team_members}/5</div>`;
+            }
+
             let actions = '';
             if (isOwn) {
                 actions = `
@@ -1054,7 +1152,7 @@
             } else {
                 actions = `<button class="btn btn-primary" onclick="sendInterest(${item.id}, ${item.user_id})">💬 Написать</button>`;
             }
-            
+
             return `
                 <div class="card">
                     <div class="card-type">${typeLabel}</div>
@@ -1063,7 +1161,11 @@
                         <span class="verification-badge ${verdictClass}">${verdictText}</span>
                     </div>
                     <div class="card-game">${gameIcon} ${item.game}</div>
-                    <div class="card-details">${details}<div style="margin-top:8px;"><span>Описание:</span> ${item.description || 'Нет описания'}</div></div>
+                    <div class="card-details">${details}
+                        <div style="margin-top:8px;">
+                            <span>Описание:</span> ${item.description || 'Нет описания'}
+                        </div>
+                    </div>
                     <div class="card-actions">${actions}</div>
                 </div>
             `;
@@ -1111,7 +1213,7 @@
             const profileId = document.getElementById('editProfileId').value;
             const type = document.getElementById('editType').value;
             const game = document.getElementById('editGame').value;
-            
+
             let rank = document.getElementById('editRankSelect').value;
             if (!rank) rank = document.getElementById('editRankInput').value;
 
@@ -1208,12 +1310,12 @@
 
         function escapeHtml(str) {
             if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
+            return str.replace(/[&<>]/g, function (m) {
                 if (m === '&') return '&amp;';
                 if (m === '<') return '&lt;';
                 if (m === '>') return '&gt;';
                 return m;
-            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function (c) {
                 return c;
             }).replace(/'/g, "\\'");
         }
@@ -1227,9 +1329,9 @@
             else {
                 document.querySelectorAll('.tab').forEach(tab => {
                     if (tab.textContent.includes(
-                        tabName === 'profile' ? 'Профиль' : 
-                        tabName === 'search' ? 'Поиск' : 
-                        tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать'
+                        tabName === 'profile' ? 'Профиль' :
+                            tabName === 'search' ? 'Поиск' :
+                                tabName === 'my-profiles' ? 'Мои анкеты' : 'Создать'
                     )) {
                         tab.classList.add('active');
                     }
@@ -1280,6 +1382,7 @@
             // Загружаем данные
             loadSearch();
             loadProfile();
+            loadSteamGames();
         });
     </script>
 </body>

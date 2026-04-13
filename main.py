@@ -2,21 +2,24 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from urllib.parse import urlencode
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram.client.session.aiohttp import AiohttpSession
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import usersservice
 from fastapi.staticfiles import StaticFiles
 import json
+import re
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 
+# ---------- Pydantic модели ----------
 class InterestRequest(BaseModel):
     profile_id: int
     owner_user_id: int
@@ -30,30 +33,46 @@ class VerificationReport(BaseModel):
     verdict: str
     findings: dict
 
+class RegisterPlayerRequest(BaseModel):
+    user_id: int
+    type: str = "player"
+    name: str
+    game: str
+    role: str
+    rank: str
+    description: str = ""
+    steam_playtime: int = 0
+
+class RegisterTeamRequest(BaseModel):
+    user_id: int
+    type: str = "team"
+    name: str
+    game: str
+    rank: str
+    members: int
+    description: str = ""
+
 # ---------- Telegram Bot ----------
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8605814904:AAHNo71VB6cORx159yxWSEV7FiBw-ia2pHU")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.app")
-PROXY_URL = 'socks5://193.233.254.63:1080'
+STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
+STEAM_RETURN_URL = os.getenv("STEAM_RETURN_URL", f"{WEB_APP_URL}/auth/steam/callback")
 
 dp = Dispatcher()
 
-async def create_bot_and_dispatcher():
-    bot = Bot(token=BOT_TOKEN)
-    return bot
+async def create_bot():
+    return Bot(token=BOT_TOKEN)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     await usersservice.user_service.add_or_update_user(chat_id, user_id)
-
     text = (
         "👋 Добро пожаловать в **Team Find**!\n\n"
         "Нажми «Открыть Team Find🎮», чтобы создать профиль или найти команду."
     )
-
     webapp_url_with_user = f"{WEB_APP_URL}?user_id={user_id}"
-
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Открыть Team Find🎮", web_app=WebAppInfo(url=webapp_url_with_user))]
@@ -61,49 +80,15 @@ async def cmd_start(message: types.Message):
     )
     await message.answer(text, reply_markup=keyboard, parse_mode="Markdown")
 
-@dp.message(Command("register_player"))
-async def cmd_register_player(message: types.Message):
-    await message.answer("Используй мини-приложение для регистрации.")
-
-@dp.message(Command("register_team"))
-async def cmd_register_team(message: types.Message):
-    await message.answer("Используй мини-приложение для регистрации.")
-
 @dp.message()
 async def any_message(message: types.Message):
     await message.answer("Используй /start для начала работы.")
 
-@dp.message(lambda msg: msg.web_app_data is not None)
-async def handle_webapp_data(message: types.Message):
-    data = json.loads(message.web_app_data.data)
-    user_id = message.from_user.id
-    if data['type'] == 'player':
-        result = await usersservice.user_service.add_user(
-            user_id=user_id,
-            name=data['name'],
-            game=data['game'],
-            role=data['role'],
-            rank=data['rank'],
-            description=data['description']
-        )
-    else:
-        result = await usersservice.user_service.add_team(
-            user_id=user_id,
-            name=data['name'],
-            game=data['game'],
-            rank=data['rank'],
-            members=data['members'],
-            description=data['description']
-        )
-    await message.answer("✅ Анкета создана! Загляни в 'Мои анкеты'.")
-
-# ---------- FastAPI WebApp ----------
+# ---------- FastAPI ----------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     await usersservice.user_service.init_db()
     yield
-    # Shutdown (опционально закрываем соединения, если нужно)
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
@@ -114,28 +99,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Статика и корень
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
 async def read_root():
     return FileResponse(os.path.join("mini-app", "index.html"))
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# ---------- Steam OpenID ----------
+@app.get("/auth/steam")
+async def steam_login(user_id: int):
+    realm = WEB_APP_URL
+    return_to = STEAM_RETURN_URL
+    params = {
+        'openid.ns': 'http://specs.openid.net/auth/2.0',
+        'openid.mode': 'checkid_setup',
+        'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select',
+        'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
+        'openid.return_to': f"{return_to}?user_id={user_id}",
+        'openid.realm': realm,
+    }
+    steam_login_url = "https://steamcommunity.com/openid/login?" + urlencode(params)
+    return RedirectResponse(steam_login_url)
 
-@app.get("/api/data")
-async def get_data(game: str = "all", type_filter: str = "all", search: str = ""):
-    try:
-        data = await usersservice.user_service.search(game=game, type_filter=type_filter, search_text=search)
-        return JSONResponse(content=data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/auth/steam/callback")
+async def steam_callback(request: Request, user_id: Optional[int] = None):
+    if user_id is None:
+        return JSONResponse({"error": "Missing user_id"}, status_code=400)
+    query = dict(request.query_params)
+    # Проверка подписи OpenID (упрощённо: достаточно проверить наличие openid.claimed_id)
+    claimed_id = query.get('openid.claimed_id')
+    if not claimed_id:
+        return JSONResponse({"error": "Invalid Steam response"}, status_code=400)
+    # Извлекаем SteamID64 из claimed_id
+    match = re.search(r'https://steamcommunity.com/openid/id/(\d+)', claimed_id)
+    if not match:
+        return JSONResponse({"error": "Could not extract Steam ID"}, status_code=400)
+    steam_id = match.group(1)
+    # Сохраняем SteamID в БД
+    await usersservice.user_service.update_steam_id(user_id, steam_id)
+    # Перенаправляем обратно в приложение
+    return RedirectResponse(url=f"{WEB_APP_URL}?user_id={user_id}")
 
-@app.get("/api/user-profiles/{user_id}")
-async def get_user_profiles(user_id: int):
-    try:
-        profiles = await usersservice.user_service.get_user_profiles(user_id)
-        return JSONResponse(content=profiles)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# ---------- API Steam games ----------
+@app.get("/api/steam/games")
+async def get_steam_games(user_id: int):
+    games = await usersservice.user_service.get_steam_games(user_id)
+    return JSONResponse(content=games)
 
+# ---------- API регистрации ----------
 @app.post("/api/register")
 async def register(data: dict):
     try:
@@ -149,7 +161,8 @@ async def register(data: dict):
                 game=data['game'],
                 role=data['role'],
                 rank=data['rank'],
-                description=data['description']
+                description=data.get('description', ''),
+                steam_playtime=data.get('steam_playtime', 0)
             )
         else:
             result = await usersservice.user_service.add_team(
@@ -157,12 +170,29 @@ async def register(data: dict):
                 name=data['name'],
                 game=data['game'],
                 rank=data['rank'],
-                members=data['members'],
+                members=data.get('members', 5),
                 description=data.get('description', '')
             )
         return {"status": "success", **result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ---------- Прочие API ----------
+@app.get("/api/data")
+async def get_data(game: str = "all", type_filter: str = "all", search: str = ""):
+    try:
+        data = await usersservice.user_service.search(game=game, type_filter=type_filter, search_text=search)
+        return JSONResponse(content=data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/user-profiles/{user_id}")
+async def get_user_profiles(user_id: int):
+    try:
+        profiles = await usersservice.user_service.get_user_profiles(user_id)
+        return JSONResponse(content=profiles)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -184,7 +214,6 @@ async def update_profile(profile_id: int, data: dict):
         if user_id == 0:
             raise ValueError("user_id required")
         update_data = {k: v for k, v in data.items() if k != 'user_id'}
-        # Проверка: если тип команды, то обновляем team_members
         success = await usersservice.user_service.update_profile(user_id, profile_id, **update_data)
         if success:
             return {"status": "success"}
@@ -192,7 +221,7 @@ async def update_profile(profile_id: int, data: dict):
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.get("/api/user/{user_id}/verification-status")
 async def get_user_verification_status(user_id: int):
     try:
@@ -200,22 +229,16 @@ async def get_user_verification_status(user_id: int):
         return JSONResponse(content=status)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.post("/api/user/{user_id}/verification")
 async def receive_user_verification_report(user_id: int, report: VerificationReport):
-    """
-    Принимает отчёт от клиента античита для верификации пользователя.
-    """
     try:
-        # Проверяем, существует ли пользователь
         user = await usersservice.user_service._get_user_by_user_id(user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
-        # Сохраняем результат верификации
         success = await usersservice.user_service.save_user_verification(user_id, report.dict())
         if success:
-            return {"status": "success", "message": "Verification report saved for user"}
+            return {"status": "success"}
         else:
             raise HTTPException(status_code=500, detail="Failed to save report")
     except Exception as e:
@@ -224,43 +247,33 @@ async def receive_user_verification_report(user_id: int, report: VerificationRep
 @app.post("/api/interest")
 async def send_interest(req: InterestRequest):
     try:
-        # Получаем данные анкеты
         profile = await usersservice.user_service.get_profile_by_id(req.profile_id)
         if not profile:
             raise HTTPException(status_code=404, detail="Анкета не найдена")
-
-        # Получаем chat_id владельца
         owner_chat_id = await usersservice.user_service.get_chat_id_by_user_id(req.owner_user_id)
         if not owner_chat_id:
-            raise HTTPException(status_code=404, detail="Владелец анкеты не найден в базе")
-
-        # Формируем текст и ссылку на откликнувшегося
+            raise HTTPException(status_code=404, detail="Владелец анкеты не найден")
         if req.current_username:
             mention = f"@{req.current_username}"
             link = f"tg://resolve?domain={req.current_username}"
         else:
             mention = f"пользователь {req.current_user_id}"
             link = f"tg://user?id={req.current_user_id}"
-
         profile_type = profile['type']
         profile_name = profile['name']
-
         if profile_type == 'team':
             text = f"🏆 В вашу команду **{profile_name}** хочет вступить {mention}\n\n👉 [Написать {mention}]({link})"
         else:
             text = f"👤 Пользователь {mention} заинтересован в вашей анкете игрока **{profile_name}**\n\n👉 [Написать {mention}]({link})"
-
-        # Отправляем сообщение через бота
-        bot = await create_bot_and_dispatcher()
+        bot = await create_bot()
         await bot.send_message(owner_chat_id, text, parse_mode="Markdown", disable_web_page_preview=True)
-
         return {"status": "success", "message": "Уведомление отправлено"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ---------- Запуск обоих сервисов ----------
+# ---------- Запуск ----------
 async def run_bot():
-    bot = await create_bot_and_dispatcher()
+    bot = await create_bot()
     await dp.start_polling(bot, skip_updates=True)
 
 async def run_web():
