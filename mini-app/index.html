@@ -227,6 +227,7 @@
         }
 
         .btn-primary {
+            margin-top: 10px;
             background: transparent;
             color: #66fcf1;
         }
@@ -553,19 +554,25 @@
                     <div class="profile-info">
                         <h2 id="profileName">Загрузка...</h2>
                         <p id="profileTelegramId">Telegram ID: <span id="profileUserIdSpan"></span></p>
-                        <p id="steamStatus">Steam: <span id="steamLinkedStatus">не привязан</span></p>
                     </div>
                 </div>
 
                 <div class="verification-summary" id="verificationSummary">
                     <h3>🛡️ Статус верификации</h3>
                     <div id="verificationStatusBlock">Загрузка...</div>
+                    <button class="btn btn-primary" onclick="downloadChecker()">⬇️ Скачать чекер</button>
+                    <button class="btn btn-primary" onclick="showCheckerInstruction()">📋 Инструкция</button>
+                </div>
+
+                <div class="verification-summary" id="verificationSummary">
+                    <h3>🔗 Steam</h3>
+                    <div id="steamLinkedStatus">Загрузка...</div>
+                    <button class="btn btn-primary" onclick="linkSteam()">🔗 Привязать Steam</button>
                 </div>
 
                 <div class="profile-actions">
-                    <button class="btn btn-primary" onclick="linkSteam()">🔗 Привязать Steam</button>
-                    <button class="btn btn-primary" onclick="downloadChecker()">⬇️ Скачать чекер</button>
-                    <button class="btn btn-primary" onclick="showCheckerInstruction()">📋 Инструкция</button>
+                    
+                    
                 </div>
 
                 <h3 style="margin: 20px 0 15px;">📋 Мои анкеты</h3>
