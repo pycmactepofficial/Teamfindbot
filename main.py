@@ -120,28 +120,49 @@ async def steam_login(user_id: int):
         'openid.realm': realm,
     }
     steam_login_url = "https://steamcommunity.com/openid/login?" + urlencode(params)
+    logging.info(f"Redirecting to Steam login for user_id={user_id}")
     return RedirectResponse(steam_login_url)
 
 @app.get("/auth/steam/callback")
 async def steam_callback(request: Request, user_id: Optional[int] = None):
+    logging.info(f"Steam callback called, query={dict(request.query_params)}")
+    # Извлекаем user_id из query string, если не передан в пути
+    query_params = dict(request.query_params)
+    if user_id is None and 'user_id' in query_params:
+        user_id = int(query_params['user_id'])
     if user_id is None:
+        logging.error("Missing user_id in callback")
         return JSONResponse({"error": "Missing user_id"}, status_code=400)
-    query = dict(request.query_params)
-    # Проверка подписи OpenID (упрощённо: достаточно проверить наличие openid.claimed_id)
-    claimed_id = query.get('openid.claimed_id')
+    
+    claimed_id = query_params.get('openid.claimed_id')
     if not claimed_id:
+        logging.error("No openid.claimed_id in response")
         return JSONResponse({"error": "Invalid Steam response"}, status_code=400)
-    # Извлекаем SteamID64 из claimed_id
+    
     match = re.search(r'https://steamcommunity.com/openid/id/(\d+)', claimed_id)
     if not match:
+        logging.error(f"Could not extract SteamID from {claimed_id}")
         return JSONResponse({"error": "Could not extract Steam ID"}, status_code=400)
     steam_id = match.group(1)
-    # Сохраняем SteamID в БД
-    await usersservice.user_service.update_steam_id(user_id, steam_id)
-    # Перенаправляем обратно в приложение
-    return RedirectResponse(url=f"{WEB_APP_URL}?user_id={user_id}")
+    logging.info(f"Extracted steam_id={steam_id} for user_id={user_id}")
+    
+    success = await usersservice.user_service.update_steam_id(user_id, steam_id)
+    if success:
+        logging.info(f"SteamID {steam_id} saved for user {user_id}")
+    else:
+        logging.error(f"Failed to save SteamID for user {user_id}")
+    
+    redirect_url = f"{WEB_APP_URL}?user_id={user_id}"
+    return RedirectResponse(url=redirect_url)
 
-# ---------- API Steam games ----------
+@app.get("/api/steam/status")
+async def get_steam_status(user_id: int):
+    steam_id = await usersservice.user_service.get_steam_id(user_id)
+    if not steam_id:
+        return {"linked": False, "has_games": False}
+    games = await usersservice.user_service.get_steam_games(user_id)
+    return {"linked": True, "has_games": len(games) > 0, "games_count": len(games)}
+
 @app.get("/api/steam/games")
 async def get_steam_games(user_id: int):
     games = await usersservice.user_service.get_steam_games(user_id)
@@ -188,6 +209,7 @@ async def get_data(game: str = "all", type_filter: str = "all", search: str = ""
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ---------- API Профиля ----------
 @app.get("/api/user-profiles/{user_id}")
 async def get_user_profiles(user_id: int):
     try:
@@ -221,7 +243,8 @@ async def update_profile(profile_id: int, data: dict):
             raise HTTPException(status_code=404, detail="Not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+    
+# ---------- Верефикация ----------
 @app.get("/api/user/{user_id}/verification-status")
 async def get_user_verification_status(user_id: int):
     try:
@@ -243,7 +266,8 @@ async def receive_user_verification_report(user_id: int, report: VerificationRep
             raise HTTPException(status_code=500, detail="Failed to save report")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+    
+# ---------- Взаимодействие с анкетой ----------
 @app.post("/api/interest")
 async def send_interest(req: InterestRequest):
     try:

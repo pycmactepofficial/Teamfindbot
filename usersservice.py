@@ -5,6 +5,7 @@ import os
 from contextlib import asynccontextmanager
 import json
 import aiohttp
+import logging
 
 DB_PATH = os.getenv("DB_PATH", "users.db")
 STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
@@ -79,12 +80,28 @@ class UserService:
     # ---------- Steam ----------
     async def update_steam_id(self, user_id: int, steam_id: str) -> bool:
         async with self._get_connection() as conn:
+            # Сначала убедимся, что пользователь существует
+            async with conn.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                user = await cursor.fetchone()
+                if not user:
+                    now = datetime.now().isoformat()
+                    await conn.execute(
+                        "INSERT INTO users (chat_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                        (user_id, user_id, now, now)
+                    )
+                    logging.info(f"Created user record for {user_id}")
+            # Обновляем steam_id
             await conn.execute(
                 "UPDATE users SET steam_id = ?, updated_at = ? WHERE user_id = ?",
                 (steam_id, datetime.now().isoformat(), user_id)
             )
             await conn.commit()
-            return True
+            # Проверяем
+            async with conn.execute("SELECT steam_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
+                row = await cursor.fetchone()
+                success = row is not None and row['steam_id'] == steam_id
+                logging.info(f"update_steam_id for user {user_id}: {'OK' if success else 'FAIL'}")
+                return success
 
     async def get_steam_id(self, user_id: int) -> Optional[str]:
         async with self._get_connection() as conn:
@@ -94,7 +111,11 @@ class UserService:
 
     async def get_steam_games(self, user_id: int) -> List[Dict]:
         steam_id = await self.get_steam_id(user_id)
-        if not steam_id or not STEAM_API_KEY:
+        if not steam_id:
+            logging.warning(f"No steam_id for user {user_id}")
+            return []
+        if not STEAM_API_KEY:
+            logging.error("STEAM_API_KEY not set")
             return []
         url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
         params = {
@@ -106,6 +127,11 @@ class UserService:
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url, params=params) as resp:
+                    text = await resp.text()
+                    logging.info(f"Steam API for {steam_id}: status {resp.status}, preview {text[:200]}")
+                    if resp.status != 200:
+                        logging.error(f"Steam API error: {resp.status}")
+                        return []
                     data = await resp.json()
                     games = data.get('response', {}).get('games', [])
                     return [{
@@ -114,7 +140,8 @@ class UserService:
                         'playtime_minutes': g.get('playtime_forever', 0),
                         'img_icon_url': g.get('img_icon_url', '')
                     } for g in games]
-            except Exception:
+            except Exception as e:
+                logging.exception(f"Exception in get_steam_games: {e}")
                 return []
 
     # ---------- Пользователи ----------
@@ -259,7 +286,8 @@ class UserService:
             ) as cursor:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
-
+            
+    # ---------- Поиск ----------
     async def search(self, game: Optional[str] = None, type_filter: Optional[str] = None, search_text: Optional[str] = None) -> List[Dict]:
         query = """
             SELECT profiles.*, users.user_id AS owner_user_id, users.verification_verdict AS user_verdict

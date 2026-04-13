@@ -796,6 +796,7 @@
             }
         }
 
+        // ===== Steam =====
         function linkSteam() {
             if (!currentUserId) {
                 alert('ID пользователя не определён');
@@ -841,6 +842,28 @@
                 playtimeDiv.style.display = 'none';
             }
         }
+
+        async function checkSteamStatus() {
+            if (!currentUserId) return;
+            try {
+                const resp = await fetch(`/api/steam/status?user_id=${currentUserId}`);
+                const data = await resp.json();
+                const statusSpan = document.getElementById('steamLinkedStatus');
+                if (data.linked) {
+                    if (data.has_games) {
+                        statusSpan.innerHTML = `✅ привязан (${data.games_count} игр)`;
+                    } else {
+                        statusSpan.innerHTML = `⚠️ привязан, но профиль закрыт или нет игр`;
+                    }
+                } else {
+                    statusSpan.innerHTML = `❌ не привязан`;
+                }
+            } catch(e) {
+                console.error(e);
+                document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка проверки';
+            }
+        }
+
 
         // ===== ЗАПОЛНЕНИЕ ВЫПАДАЮЩИХ СПИСКОВ =====
         function populateGames() {
@@ -1390,6 +1413,7 @@
             loadSearch();
             loadProfile();
             loadSteamGames();
+            checkSteamStatus(); 
         });
     </script>
 </body>
