@@ -121,8 +121,8 @@ class UserService:
         params = {
             'key': STEAM_API_KEY,
             'steamid': steam_id,
-            'include_appinfo': True,
-            'include_played_free_games': True
+            'include_appinfo': '1',
+            'include_played_free_games': '1'
         }
         async with aiohttp.ClientSession() as session:
             try:
