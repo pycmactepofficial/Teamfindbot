@@ -161,6 +161,8 @@ async def register(data: dict):
                 description=data.get('description', '')
             )
         return {"status": "success", **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -218,7 +220,7 @@ async def receive_user_verification_report(user_id: int, report: VerificationRep
             raise HTTPException(status_code=500, detail="Failed to save report")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.post("/api/interest")
 async def send_interest(req: InterestRequest):
     try:

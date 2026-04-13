@@ -885,8 +885,8 @@
         // Показать инструкцию (та же модалка, что и раньше, но без привязки к конкретной анкете)
         function showCheckerInstruction() {
             // Показываем общую инструкцию, ID можно не указывать или сказать, что нужно выбрать анкету
-            document.getElementById('verifyProfileIdSpan').textContent = 'ID_АНКЕТЫ';
-            document.getElementById('verifyProfileIdSpan2').textContent = 'ID_АНКЕТЫ';
+            document.getElementById('verifyProfileIdSpan').textContent = currentUserId;
+            document.getElementById('verifyProfileIdSpan2').textContent = currentUserId;
             document.getElementById('verifyModal').classList.add('active');
         }
 

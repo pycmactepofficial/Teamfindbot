@@ -167,6 +167,11 @@ class UserService:
                 await conn.commit()
                 return {"status": "updated", "id": profile_id}
             else:
+                # Проверка лимита: не более одного игрока на игру
+                existing_count = await self.count_profiles_by_type_and_game(user_id, 'player', game)
+                if existing_count > 0:
+                    raise ValueError(f"Вы уже имеете анкету игрока для игры {game}. Можно создать только одну анкету игрока на игру.")
+                
                 cursor = await conn.execute(
                     """INSERT INTO profiles
                        (user_id, type, name, game, role, rank, description, created_at, updated_at)
@@ -200,6 +205,11 @@ class UserService:
                 await conn.commit()
                 return {"status": "updated", "id": profile_id}
             else:
+                # Проверка лимита: не более одной команды на игру
+                existing_count = await self.count_profiles_by_type_and_game(user_id, 'team', game)
+                if existing_count > 0:
+                    raise ValueError(f"Вы уже имеете анкету команды для игры {game}. Можно создать только одну анкету команды на игру.")
+                
                 cursor = await conn.execute(
                     """INSERT INTO profiles
                     (user_id, type, name, game, rank, description, team_members, created_at, updated_at)
@@ -376,5 +386,14 @@ class UserService:
                         "last_check": row['last_verification']
                     }
                 return None
+    
+    async def count_profiles_by_type_and_game(self, user_id: int, profile_type: str, game: str) -> int:
+        async with self._get_connection() as conn:
+            cursor = await conn.execute(
+                "SELECT COUNT(*) FROM profiles WHERE user_id = ? AND type = ? AND game = ?",
+                (user_id, profile_type, game)
+            )
+            row = await cursor.fetchone()
+            return row[0] if row else 0
 
 user_service = UserService()
