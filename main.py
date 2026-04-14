@@ -194,6 +194,17 @@ async def get_steam_games(user_id: int):
     games = await usersservice.user_service.get_steam_games(user_id)
     return JSONResponse(content=games)
 
+@app.get("/api/steam/playtime")
+async def get_steam_playtime(user_id: int, game_name: str):
+    steam_id = await usersservice.user_service.get_steam_id(user_id)
+    if not steam_id:
+        return {"playtime_minutes": 0, "error": "Steam not linked"}
+    games = await usersservice.user_service.get_steam_games(user_id)
+    for game in games:
+        if game['name'].lower() == game_name.lower():
+            return {"playtime_minutes": game.get('playtime_minutes', 0)}
+    return {"playtime_minutes": 0}
+
 # ---------- API регистрации ----------
 @app.post("/api/register")
 async def register(data: dict):
