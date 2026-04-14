@@ -59,6 +59,14 @@ WEB_APP_URL = os.getenv("WEB_APP_URL", "https://web-production-be2c5.up.railway.
 STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
 STEAM_RETURN_URL = os.getenv("STEAM_RETURN_URL", f"{WEB_APP_URL}/auth/steam/callback")
 
+GAME_NAME_MAP = {
+    'CS2': 'Counter-Strike 2',
+    'Dota 2': 'Dota 2',
+    'Valorant': 'Valorant',
+    'Fortnite': 'Fortnite',
+    'LoL': 'League of Legends',
+}
+
 dp = Dispatcher()
 
 async def create_bot():
@@ -200,8 +208,9 @@ async def get_steam_playtime(user_id: int, game_name: str):
     if not steam_id:
         return {"playtime_minutes": 0, "error": "Steam not linked"}
     games = await usersservice.user_service.get_steam_games(user_id)
+    steam_game_name = GAME_NAME_MAP.get(game_name, game_name)
     for game in games:
-        if game['name'].lower() == game_name.lower():
+        if game['name'].lower() == steam_game_name:
             logging.log({"playtime_minutes": game.get('playtime_minutes', 0)})
             return {"playtime_minutes": game.get('playtime_minutes', 0)}
     return {"playtime_minutes": 0}
