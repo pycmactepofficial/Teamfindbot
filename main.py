@@ -202,7 +202,7 @@ async def get_steam_playtime(user_id: int, game_name: str):
     games = await usersservice.user_service.get_steam_games(user_id)
     for game in games:
         if game['name'].lower() == game_name.lower():
-            print({"playtime_minutes": game.get('playtime_minutes', 0)})
+            logging.log({"playtime_minutes": game.get('playtime_minutes', 0)})
             return {"playtime_minutes": game.get('playtime_minutes', 0)}
     return {"playtime_minutes": 0}
 
