@@ -111,12 +111,9 @@ class UserService:
 
     async def get_steam_games(self, user_id: int) -> List[Dict]:
         steam_id = await self.get_steam_id(user_id)
-        if not steam_id:
-            logging.warning(f"No steam_id for user {user_id}")
+        if not steam_id or not STEAM_API_KEY:
             return []
-        if not STEAM_API_KEY:
-            logging.error("STEAM_API_KEY not set")
-            return []
+
         url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
         params = {
             'key': STEAM_API_KEY,
@@ -127,19 +124,21 @@ class UserService:
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url, params=params) as resp:
-                    text = await resp.text()
-                    logging.info(f"Steam API for {steam_id}: status {resp.status}, preview {text[:200]}")
                     if resp.status != 200:
                         logging.error(f"Steam API error: {resp.status}")
                         return []
                     data = await resp.json()
                     games = data.get('response', {}).get('games', [])
-                    return [{
-                        'appid': g['appid'],
-                        'name': g.get('name', 'Unknown'),
-                        'playtime_minutes': g.get('playtime_forever', 0),
-                        'img_icon_url': g.get('img_icon_url', '')
-                    } for g in games]
+                    result = []
+                    for game in games:
+                        result.append({
+                            'appid': game['appid'],
+                            'name': game.get('name', 'Unknown'),
+                            'playtime_minutes': game.get('playtime_forever', 0),  # вот оно, чистое время
+                            'img_icon_url': game.get('img_icon_url', '')
+                        })
+                    logging.info(f"Steam games for {steam_id}: {len(result)} games")
+                    return result
             except Exception as e:
                 logging.exception(f"Exception in get_steam_games: {e}")
                 return []
@@ -192,9 +191,14 @@ class UserService:
             ) as cursor:
                 existing = await cursor.fetchone()
             if existing:
-                # Обновляем
-
-                return {"status": "error", "id": existing[0], "detail": "Анкета уже существует"}
+                await conn.execute(
+                    """UPDATE profiles
+                    SET name = ?, role = ?, rank = ?, description = ?, steam_playtime = ?, updated_at = ?
+                    WHERE id = ?""",
+                    (name, role, rank, description, steam_playtime, now, existing[0])
+                )
+                await conn.commit()
+                return {"status": "updated", "id": existing[0]}
             else:
                 cursor = await conn.execute(
                     """INSERT INTO profiles

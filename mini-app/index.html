@@ -1061,14 +1061,18 @@
                 return;
             }
 
+            // Если игрок – обязательно обновляем список игр перед отправкой
+            if (currentType === 'player') {
+                await loadSteamGames();  // дожидаемся загрузки
+            }
+
             let data;
             if (currentType === 'player') {
                 const name = document.getElementById('regName').value.trim();
                 if (!name) { alert('Введите ник игрока'); return; }
                 const game = document.getElementById('regGame').value;
-                let steamPlaytime = 0;
                 const steamGame = steamGames.find(g => g.name.toLowerCase() === game.toLowerCase());
-                if (steamGame) steamPlaytime = steamGame.playtime_minutes;
+                const steamPlaytime = steamGame ? steamGame.playtime_minutes : 0;
                 data = {
                     user_id: currentUserId,
                     type: 'player',
@@ -1080,6 +1084,7 @@
                     steam_playtime: steamPlaytime
                 };
             } else {
+                // команда – без времени
                 const name = document.getElementById('teamName').value.trim();
                 if (!name) { alert('Введите название команды'); return; }
                 data = {
@@ -1102,21 +1107,8 @@
                 const result = await response.json();
                 if (response.ok) {
                     alert('✅ Анкета создана!');
-                    // Ручная очистка полей (кроме ника Steam)
-                    if (currentType === 'player') {
-                        document.getElementById('regRole').selectedIndex = 0;
-                        document.getElementById('regRank').selectedIndex = 0;
-                        document.getElementById('regDesc').value = '';
-                        // regName и regGame не трогаем
-                    } else {
-                        document.getElementById('teamName').value = '';
-                        document.getElementById('teamRank').selectedIndex = 0;
-                        document.getElementById('teamMembers').value = '5';
-                        document.getElementById('regDesc').value = '';
-                    }
-                    // Заново подтягиваем Steam ник (на случай если нужно обновить)
-                    await loadSteamUserInfo();
-                    loadMyProfiles();
+                    // очистка полей...
+                    await loadMyProfiles();
                     switchTab(null, 'my-profiles');
                 } else {
                     alert('❌ Ошибка: ' + (result.detail || 'Неизвестная ошибка'));
