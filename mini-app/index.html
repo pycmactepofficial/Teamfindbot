@@ -1150,7 +1150,7 @@
                     return;
                 }
                 container.innerHTML = profiles.map(p => createCard(p, true)).join('');
-                await loadPlaytimesForCards(data); 
+                await loadPlaytimesForCards(profiles); 
             } catch (err) {
                 alert('Ошибка загрузки моих анкет: ' + err.message);
             }
