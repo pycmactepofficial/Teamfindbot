@@ -206,13 +206,34 @@ async def get_steam_games(user_id: int):
 async def get_steam_playtime(user_id: int, game_name: str):
     steam_id = await usersservice.user_service.get_steam_id(user_id)
     if not steam_id:
+        logging.warning(f"Steam not linked for user {user_id}")
         return {"playtime_minutes": 0, "error": "Steam not linked"}
+    
     games = await usersservice.user_service.get_steam_games(user_id)
-    steam_game_name = GAME_NAME_MAP.get(game_name, game_name)
+    if not games:
+        logging.warning(f"No games or private profile for user {user_id}")
+        return {"playtime_minutes": 0}
+    
+    # Логируем первые 5 игр для отладки
+    logging.info(f"User {user_id} has games: {[g['name'] for g in games[:5]]}")
+    
+    # Пробуем найти игру по маппингу или оригинальному названию
+    target_name = GAME_NAME_MAP.get(game_name, game_name).lower()
     for game in games:
-        if game['name'].lower() == steam_game_name:
-            logging.log({"playtime_minutes": game.get('playtime_minutes', 0)})
-            return {"playtime_minutes": game.get('playtime_minutes', 0)}
+        if target_name in game['name'].lower():
+            minutes = game.get('playtime_minutes', 0)
+            logging.info(f"Found game {game['name']} with minutes {minutes}")
+            return {"playtime_minutes": minutes}
+    
+    # Если не нашли, попробуем частичное совпадение с исходным названием
+    game_name_lower = game_name.lower()
+    for game in games:
+        if game_name_lower in game['name'].lower():
+            minutes = game.get('playtime_minutes', 0)
+            logging.info(f"Found (partial) {game['name']} with minutes {minutes}")
+            return {"playtime_minutes": minutes}
+    
+    logging.warning(f"Game {game_name} not found in user's Steam library")
     return {"playtime_minutes": 0}
 
 # ---------- API регистрации ----------
