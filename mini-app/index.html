@@ -1187,9 +1187,9 @@
                 const steamLinked = item.steam_linked === 1;
                 const playtimeHours = item.steam_playtime ? Math.floor(item.steam_playtime / 60) : 0;
                 if (steamLinked) {
-                    details += `<div><span>🎮 Часы в Steam:</span> ${playtimeHours} ч.</div>`;
+                    details += `<div><span>Часы в игре:</span> ${playtimeHours} ч.</div>`;
                 } else {
-                    details += `<div><span>🎮 Steam:</span> ❌ не привязан</div>`;
+                    details += `<div><span>Steam:</span> ❌ не привязан</div>`;
                 }
             }
             
