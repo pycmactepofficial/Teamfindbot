@@ -1183,10 +1183,23 @@
                 if (item.type === 'player' && item.steam_linked === 1) {
                     const span = document.getElementById(`playtime-${item.id}`);
                     if (span && span.innerText === '⏳') {
-                        const resp = await fetch(`/api/steam/playtime?user_id=${item.user_id}&game_name=${encodeURIComponent(item.game)}`);
-                        const data = await resp.json();
-                        const hours = Math.floor(data.playtime_minutes / 60);
-                        span.innerText = hours;
+                        try {
+                            const resp = await fetch(`/api/steam/playtime?user_id=${item.user_id}&game_name=${encodeURIComponent(item.game)}`);
+                            if (!resp.ok) {
+                                console.error(`HTTP ${resp.status} для игры ${item.game}`);
+                                span.innerText = '❌';
+                                continue;
+                            }
+                            const data = await resp.json();
+                            const hours = Math.floor(data.playtime_minutes / 60);
+                            span.innerText = hours;
+                            if (hours === 0) {
+                                console.warn(`Нулевое время для ${item.game} у пользователя ${item.user_id}`);
+                            }
+                        } catch (err) {
+                            console.error('Ошибка загрузки часов:', err);
+                            span.innerText = '⚠️';
+                        }
                     }
                 }
             }

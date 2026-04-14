@@ -10,6 +10,14 @@ import logging
 DB_PATH = os.getenv("DB_PATH", "users.db")
 STEAM_API_KEY = os.getenv("STEAM_API_KEY", "")
 
+GAME_NAME_MAP = {
+    'CS2': 'Counter-Strike 2',
+    'Dota 2': 'Dota 2',
+    'Valorant': 'Valorant',
+    'Fortnite': 'Fortnite',
+    'LoL': 'League of Legends',
+}
+
 class UserService:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
@@ -108,8 +116,10 @@ class UserService:
         if not steam_id or not STEAM_API_KEY:
             return 0
         games = await self.get_steam_games(user_id)
+        # Приводим искомое название к виду, как в Steam
+        target_name = GAME_NAME_MAP.get(game_name, game_name).lower()
         for game in games:
-            if game['name'].lower() == game_name.lower():
+            if target_name in game['name'].lower():
                 return game.get('playtime_minutes', 0)
         return 0
 
