@@ -1150,6 +1150,7 @@
                     return;
                 }
                 container.innerHTML = profiles.map(p => createCard(p, true)).join('');
+                await loadPlaytimesForCards(data); 
             } catch (err) {
                 alert('Ошибка загрузки моих анкет: ' + err.message);
             }
@@ -1171,6 +1172,7 @@
                     return;
                 }
                 container.innerHTML = data.map(item => createCard(item, false)).join('');
+                await loadPlaytimesForCards(data); 
             } catch (err) {
                 alert('Ошибка поиска: ' + err.message);
             }
@@ -1457,7 +1459,6 @@
             loadSteamGames();
             loadSteamUserInfo();
             checkSteamStatus(); 
-            loadPlaytimesForCards();
         });
     </script>
 </body>
