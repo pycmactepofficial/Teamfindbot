@@ -818,11 +818,11 @@
                         document.getElementById('steamLinkedStatus').innerHTML = '❌ Не привязан или нет игр';
                     }
                 } else {
-                    document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка';
+                    document.getElementById('steamLinkedStatus').innerHTML = '⚠️ Ошибка';
                 }
             } catch (e) {
                 console.error('Steam games load error', e);
-                document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка';
+                document.getElementById('steamLinkedStatus').innerHTML = '⚠️ Ошибка';
             }
         }
 
@@ -870,19 +870,18 @@
                 const statusSpan = document.getElementById('steamLinkedStatus');
                 if (data.linked) {
                     if (data.has_games) {
-                        statusSpan.innerHTML = `✅ привязан (${data.games_count} игр)`;
+                        statusSpan.innerHTML = `✅ Привязан (${data.games_count} игр)`;
                     } else {
-                        statusSpan.innerHTML = `⚠️ привязан, но профиль закрыт или нет игр`;
+                        statusSpan.innerHTML = `⚠️ Привязан, но профиль закрыт или нет игр`;
                     }
                 } else {
-                    statusSpan.innerHTML = `❌ не привязан`;
+                    statusSpan.innerHTML = `❌ Не привязан`;
                 }
             } catch(e) {
                 console.error(e);
                 document.getElementById('steamLinkedStatus').innerHTML = '⚠️ ошибка проверки';
             }
         }
-
 
         // ===== ЗАПОЛНЕНИЕ ВЫПАДАЮЩИХ СПИСКОВ =====
         function populateGames() {
