@@ -1177,18 +1177,27 @@
             const verdict = item.user_verdict || 'not_checked';
             const verdictText = { 'clean': '✅ Верифицирован', 'suspicious': '⚠️ Подозрение', 'not_checked': '❓ Не проверен' }[verdict] || '❓ Не проверен';
             const verdictClass = `verdict-${verdict}`;
-
+            
             let details = isPlayer ?
                 `<div><span>Роль:</span> ${item.role || 'N/A'}</div><div><span>Ранг:</span> ${item.rank}</div>` :
                 `<div><span>Ранг:</span> ${item.rank}</div>`;
-            if (isPlayer && item.steam_playtime) {
-                const hours = Math.floor(item.steam_playtime / 60);
-                details += `<div><span>🎮 Часы в Steam:</span> ${hours} ч.</div>`;
+            
+            // Добавляем блок Steam
+            if (isPlayer) {
+                const steamLinked = item.steam_linked === 1;
+                const playtimeHours = item.steam_playtime ? Math.floor(item.steam_playtime / 60) : 0;
+                if (steamLinked) {
+                    details += `<div><span>🎮 Часы в Steam:</span> ${playtimeHours} ч.</div>`;
+                } else {
+                    details += `<div><span>🎮 Steam:</span> ❌ не привязан</div>`;
+                }
             }
+            
             if (!isPlayer && item.team_members) {
                 details += `<div><span>👥 Состав:</span> ${item.team_members}/5</div>`;
             }
-
+            details += `<div style="margin-top:8px;"><span>Описание:</span> ${item.description || 'Нет описания'}</div>`;
+            
             let actions = '';
             if (isOwn) {
                 actions = `
@@ -1199,7 +1208,7 @@
             } else {
                 actions = `<button class="btn btn-primary" onclick="sendInterest(${item.id}, ${item.user_id})">💬 Написать</button>`;
             }
-
+            
             return `
                 <div class="card">
                     <div class="card-type">${typeLabel}</div>
@@ -1208,11 +1217,7 @@
                         <span class="verification-badge ${verdictClass}">${verdictText}</span>
                     </div>
                     <div class="card-game">${gameIcon} ${item.game}</div>
-                    <div class="card-details">${details}
-                        <div style="margin-top:8px;">
-                            <span>Описание:</span> ${item.description || 'Нет описания'}
-                        </div>
-                    </div>
+                    <div class="card-details">${details}</div>
                     <div class="card-actions">${actions}</div>
                 </div>
             `;

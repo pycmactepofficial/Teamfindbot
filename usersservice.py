@@ -263,7 +263,9 @@ class UserService:
     async def get_user_profiles(self, user_id: int) -> List[Dict]:
         async with self._get_connection() as conn:
             async with conn.execute("""
-                SELECT profiles.*, users.verification_verdict AS user_verdict
+                SELECT profiles.*, 
+                    users.verification_verdict AS user_verdict,
+                    CASE WHEN users.steam_id IS NOT NULL THEN 1 ELSE 0 END AS steam_linked
                 FROM profiles
                 JOIN users ON profiles.user_id = users.user_id
                 WHERE profiles.user_id = ?
@@ -284,7 +286,10 @@ class UserService:
     # ---------- Поиск ----------
     async def search(self, game: Optional[str] = None, type_filter: Optional[str] = None, search_text: Optional[str] = None) -> List[Dict]:
         query = """
-            SELECT profiles.*, users.user_id AS owner_user_id, users.verification_verdict AS user_verdict
+            SELECT profiles.*, 
+                users.user_id AS owner_user_id, 
+                users.verification_verdict AS user_verdict,
+                CASE WHEN users.steam_id IS NOT NULL THEN 1 ELSE 0 END AS steam_linked
             FROM profiles
             JOIN users ON profiles.user_id = users.user_id
             WHERE 1=1
