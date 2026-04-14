@@ -1223,7 +1223,11 @@
             if (isPlayer) {
                 const steamLinked = item.steam_linked === 1;
                 if (steamLinked) {
-                    details += `<div><span>Часы в игре:</span> <span id="playtime-${item.id}" class="playtime-value">⏳</span> ч.</div>`;
+                    if (item.steam_playtime != 0) {
+                        details += `<div><span>Часы в игре:</span> <span id="playtime-${item.id}" class="playtime-value">${item.steam_playtime}</span> ч.</div>`;
+                    } else {
+                        details += `<div><span>Часы в игре:</span> <span id="playtime-${item.id}" class="playtime-value">⏳</span> ч.</div>`;
+                    }
                 } else {
                     details += `<div><span>Steam:</span> ❌ не привязан</div>`;
                 }
