@@ -1118,6 +1118,21 @@
             }
         }
 
+        async function fetchAndUpdatePlaytime(cardElement, ownerUserId, gameName, playtimeSpan) {
+            try {
+                const resp = await fetch(`/api/steam/playtime?user_id=${ownerUserId}&game_name=${encodeURIComponent(gameName)}`);
+                const data = await resp.json();
+                const hours = Math.floor(data.playtime_minutes / 60);
+                playtimeSpan.innerText = hours;
+                if (hours === 0) {
+                    playtimeSpan.innerText = '0';
+                    // можно добавить иконку "не привязан"
+                }
+            } catch (e) {
+                console.error(e);
+                playtimeSpan.innerText = '?';
+            }
+        }
 
         // ЗАГРУЗКА МОИХ АНКЕТ
         async function loadMyProfiles() {
@@ -1161,6 +1176,20 @@
             }
         }
 
+        async function loadPlaytimesForCards(items) {
+            for (const item of items) {
+                if (item.type === 'player' && item.steam_linked === 1) {
+                    const span = document.getElementById(`playtime-${item.id}`);
+                    if (span && span.innerText === '⏳') {
+                        const resp = await fetch(`/api/steam/playtime?user_id=${item.user_id}&game_name=${encodeURIComponent(item.game)}`);
+                        const data = await resp.json();
+                        const hours = Math.floor(data.playtime_minutes / 60);
+                        span.innerText = hours;
+                    }
+                }
+            }
+        }
+
         // СОЗДАНИЕ КАРТОЧКИ
         function createCard(item, isOwn) {
             const isPlayer = item.type === 'player';
@@ -1178,9 +1207,8 @@
             // Добавляем блок Steam
             if (isPlayer) {
                 const steamLinked = item.steam_linked === 1;
-                const playtimeHours = item.playtime_minutes ? Math.floor(item.playtime_minutes / 60) : 0;
                 if (steamLinked) {
-                    details += `<div><span>Часы в игре:</span> ${playtimeHours} ч.</div>`;
+                    details += `<div><span>Часы в игре:</span> <span id="playtime-${item.id}" class="playtime-value">⏳</span> ч.</div>`;
                 } else {
                     details += `<div><span>Steam:</span> ❌ не привязан</div>`;
                 }
@@ -1195,7 +1223,6 @@
             if (isOwn) {
                 actions = `
                     <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${escapeHtml(item.name)}', \`${escapeHtml(item.description || '')}\`, '${item.rank}', '${item.game}', '${item.type}', ${item.team_members || 0})">✏️ Редактировать</button>
-                    <button class="btn btn-primary" onclick="openVerifyModal(${item.id})">🛡️ Проверить</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
             } else {
@@ -1430,6 +1457,7 @@
             loadSteamGames();
             loadSteamUserInfo();
             checkSteamStatus(); 
+            loadPlaytimesForCards();
         });
     </script>
 </body>

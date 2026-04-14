@@ -118,17 +118,6 @@ class UserService:
             async with conn.execute("SELECT steam_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
                 row = await cursor.fetchone()
                 return row['steam_id'] if row else None
-            
-    async def get_steam_playtime_for_game(self, user_id: int, game_name: str) -> int:
-        """Возвращает количество минут в игре для пользователя (0, если нет Steam или игра не найдена)"""
-        steam_id = await self.get_steam_id(user_id)
-        if not steam_id or not STEAM_API_KEY:
-            return 0
-        games = await self.get_steam_games(user_id)  # уже есть метод
-        for game in games:
-            if game['name'].lower() == game_name.lower():
-                return game.get('playtime_minutes', 0)
-        return 0
 
     async def get_steam_games(self, user_id: int) -> List[Dict]:
         steam_id = await self.get_steam_id(user_id)
