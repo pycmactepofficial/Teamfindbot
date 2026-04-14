@@ -1074,9 +1074,7 @@
                 if (!name) { alert('Введите ник игрока'); return; }
                 const game = document.getElementById('regGame').value;
                 const steamGame = steamGames.find(g => g.name.toLowerCase() === game.toLowerCase());
-                console.log(steamGame);
                 const steamPlaytime = steamGame ? steamGame.playtime_minutes : 0;
-                console.log(steamPlaytime);
                 data = {
                     user_id: currentUserId,
                     type: 'player',
@@ -1085,7 +1083,7 @@
                     role: document.getElementById('regRole').value,
                     rank: document.getElementById('regRank').value,
                     description: document.getElementById('regDesc').value,
-                    steam_playtime: steamPlaytime
+                    steam_playtime: 0
                 };
             } else {
                 const name = document.getElementById('teamName').value.trim();

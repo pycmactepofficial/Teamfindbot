@@ -102,6 +102,16 @@ class UserService:
                 success = row is not None and row['steam_id'] == steam_id
                 logging.info(f"update_steam_id for user {user_id}: {'OK' if success else 'FAIL'}")
                 return success
+            
+    async def get_steam_playtime_for_game(self, user_id: int, game_name: str) -> int:
+        steam_id = await self.get_steam_id(user_id)
+        if not steam_id or not STEAM_API_KEY:
+            return 0
+        games = await self.get_steam_games(user_id)
+        for game in games:
+            if game['name'].lower() == game_name.lower():
+                return game.get('playtime_minutes', 0)
+        return 0
 
     async def get_steam_id(self, user_id: int) -> Optional[str]:
         async with self._get_connection() as conn:
@@ -193,11 +203,8 @@ class UserService:
         if not user:
             await self.add_or_update_user(user_id, user_id)
 
-        # Получаем актуальное время из Steam
+        # 🔥 Получаем реальные часы из Steam API
         real_playtime = await self.get_steam_playtime_for_game(user_id, game)
-        # Если не удалось, используем переданное (0)
-        if real_playtime == 0 and steam_playtime != 0:
-            real_playtime = steam_playtime
 
         now = datetime.now().isoformat()
         async with self._get_connection() as conn:
