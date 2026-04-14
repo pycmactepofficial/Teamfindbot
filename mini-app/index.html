@@ -1074,6 +1074,7 @@
                 if (!name) { alert('Введите ник игрока'); return; }
                 const game = document.getElementById('regGame').value;
                 const steamGame = steamGames.find(g => g.name.toLowerCase() === game.toLowerCase());
+                console.log(steamGame);
                 const steamPlaytime = steamGame ? steamGame.playtime_minutes : 0;
                 console.log(steamPlaytime);
                 data = {
