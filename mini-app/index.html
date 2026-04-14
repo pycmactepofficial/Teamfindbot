@@ -846,6 +846,8 @@
             }
         }
 
+        
+
         function updatePlaytimeForGame(gameName) {
             const playtimeDiv = document.getElementById('steamPlaytimeInfo');
             if (!steamGames.length) {
@@ -1063,7 +1065,7 @@
             }
 
             if (currentType === 'player') {
-                await loadSteamGames();  // ⬅️ Ждём загрузки игр из Steam
+                await loadSteamGames();
             }
 
             let data;
@@ -1073,11 +1075,12 @@
                 const game = document.getElementById('regGame').value;
                 const steamGame = steamGames.find(g => g.name.toLowerCase() === game.toLowerCase());
                 const steamPlaytime = steamGame ? steamGame.playtime_minutes : 0;
+                console.log(steamPlaytime);
                 data = {
                     user_id: currentUserId,
                     type: 'player',
-                    name: name,
-                    game: game,
+                    name: document.getElementById('regName').value.trim(),
+                    game: document.getElementById('regGame').value,
                     role: document.getElementById('regRole').value,
                     rank: document.getElementById('regRank').value,
                     description: document.getElementById('regDesc').value,
