@@ -205,6 +205,7 @@ class UserService:
 
         # 🔥 Получаем реальные часы из Steam API
         real_playtime = await self.get_steam_playtime_for_game(user_id, game)
+        print(real_playtime)
 
         now = datetime.now().isoformat()
         async with self._get_connection() as conn:
