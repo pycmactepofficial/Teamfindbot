@@ -768,6 +768,7 @@
 
         let currentUserId = null;
         let currentType = 'player';
+        let steamGames = [];
 
         // ===== ИНИЦИАЛИЗАЦИЯ ID =====
         function initUserId() {
@@ -1061,9 +1062,8 @@
                 return;
             }
 
-            // Если игрок – обязательно обновляем список игр перед отправкой
             if (currentType === 'player') {
-                await loadSteamGames();  // дожидаемся загрузки
+                await loadSteamGames();  // ⬅️ Ждём загрузки игр из Steam
             }
 
             let data;
@@ -1084,7 +1084,6 @@
                     steam_playtime: steamPlaytime
                 };
             } else {
-                // команда – без времени
                 const name = document.getElementById('teamName').value.trim();
                 if (!name) { alert('Введите название команды'); return; }
                 data = {
@@ -1106,8 +1105,7 @@
                 });
                 const result = await response.json();
                 if (response.ok) {
-                    alert('✅ Анкета создана!');
-                    // очистка полей...
+                    alert('✅ Анкета создана/обновлена!');
                     await loadMyProfiles();
                     switchTab(null, 'my-profiles');
                 } else {
@@ -1117,6 +1115,7 @@
                 alert('❌ Ошибка запроса: ' + err.message);
             }
         }
+
 
         // ЗАГРУЗКА МОИХ АНКЕТ
         async function loadMyProfiles() {

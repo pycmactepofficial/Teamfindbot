@@ -184,13 +184,13 @@ class UserService:
 
         now = datetime.now().isoformat()
         async with self._get_connection() as conn:
-            # Проверка дубляжа
             async with conn.execute(
                 "SELECT id FROM profiles WHERE user_id = ? AND type = 'player' AND game = ?",
                 (user_id, game)
             ) as cursor:
                 existing = await cursor.fetchone()
             if existing:
+                # 🔁 Обновляем существующую анкету (включая время)
                 await conn.execute(
                     """UPDATE profiles
                     SET name = ?, role = ?, rank = ?, description = ?, steam_playtime = ?, updated_at = ?
@@ -202,8 +202,8 @@ class UserService:
             else:
                 cursor = await conn.execute(
                     """INSERT INTO profiles
-                       (user_id, type, name, game, role, rank, description, steam_playtime, created_at, updated_at)
-                       VALUES (?, 'player', ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (user_id, type, name, game, role, rank, description, steam_playtime, created_at, updated_at)
+                    VALUES (?, 'player', ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (user_id, name, game, role, rank, description, steam_playtime, now, now)
                 )
                 await conn.commit()
