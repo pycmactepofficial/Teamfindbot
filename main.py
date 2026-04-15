@@ -66,6 +66,11 @@ GAME_NAME_MAP = {
     'Fortnite': 'Fortnite',
     'LoL': 'League of Legends',
 }
+GAME_TO_APPID = {
+    'CS2': 730,          # Counter-Strike 2 / CS:GO
+    'Dota 2': 570,       # Dota 2
+    # Для других игр (Valorant, Fortnite, LoL) appid нет, так как они не в Steam
+}
 
 dp = Dispatcher()
 
@@ -214,26 +219,25 @@ async def get_steam_playtime(user_id: int, game_name: str):
         logging.warning(f"No games or private profile for user {user_id}")
         return {"playtime_minutes": 0}
     
-    # Логируем первые 5 игр для отладки
-    logging.info(f"User {user_id} has games: {[g['name'] for g in games[:5]]}")
+    # Пытаемся найти по appid
+    appid = GAME_TO_APPID.get(game_name)
+    if appid:
+        for game in games:
+            if game.get('appid') == appid:
+                minutes = game.get('playtime_minutes', 0)
+                logging.info(f"Found game {game['name']} (appid {appid}) with {minutes} minutes")
+                return {"playtime_minutes": minutes}
+        logging.warning(f"Game {game_name} (appid {appid}) not found in Steam library")
+    else:
+        # fallback: поиск по названию (для игр не из Steam)
+        target_name = GAME_NAME_MAP.get(game_name, game_name).lower()
+        for game in games:
+            if target_name in game['name'].lower():
+                minutes = game.get('playtime_minutes', 0)
+                logging.info(f"Found (by name) {game['name']} with {minutes} minutes")
+                return {"playtime_minutes": minutes}
+        logging.warning(f"Game {game_name} not found in user's Steam library")
     
-    # Пробуем найти игру по маппингу или оригинальному названию
-    target_name = GAME_NAME_MAP.get(game_name, game_name).lower()
-    for game in games:
-        if target_name in game['name'].lower():
-            minutes = game.get('playtime_minutes', 0)
-            logging.info(f"Found game {game['name']} with minutes {minutes}")
-            return {"playtime_minutes": minutes}
-    
-    # Если не нашли, попробуем частичное совпадение с исходным названием
-    game_name_lower = game_name.lower()
-    for game in games:
-        if game_name_lower in game['name'].lower():
-            minutes = game.get('playtime_minutes', 0)
-            logging.info(f"Found (partial) {game['name']} with minutes {minutes}")
-            return {"playtime_minutes": minutes}
-    
-    logging.warning(f"Game {game_name} not found in user's Steam library")
     return {"playtime_minutes": 0}
 
 # ---------- API регистрации ----------

@@ -18,6 +18,11 @@ GAME_NAME_MAP = {
     'LoL': 'League of Legends',
 }
 
+GAME_TO_APPID = {
+    'CS2': 730,
+    'Dota 2': 570,
+}
+
 class UserService:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
@@ -116,7 +121,16 @@ class UserService:
         if not steam_id or not STEAM_API_KEY:
             return 0
         games = await self.get_steam_games(user_id)
-        # Приводим искомое название к виду, как в Steam
+        
+        # Сначала по appid
+        from main import GAME_TO_APPID  # или импортировать сверху
+        appid = GAME_TO_APPID.get(game_name)
+        if appid:
+            for game in games:
+                if game.get('appid') == appid:
+                    return game.get('playtime_minutes', 0)
+        
+        # fallback по названию
         target_name = GAME_NAME_MAP.get(game_name, game_name).lower()
         for game in games:
             if target_name in game['name'].lower():
