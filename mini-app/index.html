@@ -769,6 +769,7 @@
         let currentUserId = null;
         let currentType = 'player';
         let steamGames = [];
+        let cachedSteamLinked = null;
 
         // ===== ИНИЦИАЛИЗАЦИЯ ID =====
         function initUserId() {
@@ -846,7 +847,21 @@
             }
         }
 
-        
+        async function getSteamLinkedStatus() {
+            if (!currentUserId) return false;
+            // Если кэш ещё не заполнен, делаем запрос
+            if (cachedSteamLinked === null) {
+                try {
+                    const resp = await fetch(`/api/steam/status?user_id=${currentUserId}`);
+                    const data = await resp.json();
+                    cachedSteamLinked = data.linked === true;
+                } catch (e) {
+                    console.error('Ошибка получения статуса Steam:', e);
+                    cachedSteamLinked = false;
+                }
+            }
+            return cachedSteamLinked;
+        }
 
         function updatePlaytimeForGame(gameName) {
             const playtimeDiv = document.getElementById('steamPlaytimeInfo');
@@ -1263,36 +1278,44 @@
         }
 
         // ===== РЕДАКТИРОВАНИЕ =====
-        function openEditModal(profileId, name, description, rank, game, type, members) {
-            document.getElementById('editProfileId').value = profileId;
-            document.getElementById('editName').value = name;
-            document.getElementById('editDesc').value = description || '';
-            document.getElementById('editGame').value = game;
-            document.getElementById('editType').value = type;
-
-            const membersGroup = document.getElementById('editMembersGroup');
-            const rankSelect = document.getElementById('editRankSelect');
-            const rankInput = document.getElementById('editRankInput');
-
+        async function updateProfile(e) {
+            e.preventDefault();
+            const profileId = document.getElementById('editProfileId').value;
+            const type = document.getElementById('editType').value;
+            const game = document.getElementById('editGame').value;
+            
+            let rank = document.getElementById('editRankSelect').value;
+            if (!rank) rank = document.getElementById('editRankInput').value;
+            
+            const nameField = document.getElementById('editName');
+            // Если поле заблокировано (readonly), не меняем имя
+            const newName = nameField.readOnly ? nameField.value : nameField.value;
+            
+            const data = {
+                user_id: currentUserId,
+                name: newName,
+                rank: rank,
+                description: document.getElementById('editDesc').value
+            };
             if (type === 'team') {
-                membersGroup.style.display = 'block';
-                document.getElementById('editMembers').value = members || 5;
-            } else {
-                membersGroup.style.display = 'none';
+                data.team_members = parseInt(document.getElementById('editMembers').value);
             }
-
-            // Заполняем выбор ранга
-            if (gameData[game]) {
-                rankSelect.style.display = 'block';
-                rankInput.style.display = 'none';
-                fillRankSelect(game, rank);
-            } else {
-                rankSelect.style.display = 'none';
-                rankInput.style.display = 'block';
-                rankInput.value = rank;
+            try {
+                const response = await fetch(`/api/profile/${profileId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    closeEditModal();
+                    loadMyProfiles();
+                    if (document.getElementById('profile').classList.contains('active')) loadProfile();
+                } else {
+                    alert('❌ Ошибка обновления');
+                }
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
             }
-
-            document.getElementById('editModal').classList.add('active');
         }
 
         function closeEditModal() {
@@ -1476,6 +1499,7 @@
             loadSteamGames();
             loadSteamUserInfo();
             checkSteamStatus(); 
+            getSteamLinkedStatus();
         });
     </script>
 </body>
