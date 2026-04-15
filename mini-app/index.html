@@ -1256,7 +1256,7 @@
             let actions = '';
             if (isOwn) {
                 actions = `
-                    <button class="btn btn-primary" onclick="openEditModal(${item.id}, '${escapeHtml(item.name)}', \`${escapeHtml(item.description || '')}\`, '${item.rank}', '${item.game}', '${item.type}', ${item.team_members || 0})">✏️ Редактировать</button>
+                    <button class="btn btn-primary" onclick="updateProfile(${item.id}, '${escapeHtml(item.name)}', \`${escapeHtml(item.description || '')}\`, '${item.rank}', '${item.game}', '${item.type}', ${item.team_members || 0})">✏️ Редактировать</button>
                     <button class="btn btn-danger" onclick="deleteProfile(${item.id})">🗑️ Удалить</button>
                 `;
             } else {
